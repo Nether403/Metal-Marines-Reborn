@@ -6,7 +6,14 @@ import type {
   RuntimeState,
   Tile,
 } from "./types";
-import { buildBuilding, launchMissile, stepGame, uid } from "./engine";
+import {
+  buildBuilding,
+  launchAAIntercept,
+  launchMissile,
+  projectileCurrentPos,
+  stepGame,
+  uid,
+} from "./engine";
 import { GRID_H, GRID_W } from "./constants";
 import { getMission, MISSIONS } from "@/data/missions";
 
@@ -49,10 +56,13 @@ interface Store {
   selectWeapon: (t: ProjectileType | null) => void;
   tryBuild: (x: number, y: number) => boolean;
   tryFire: (wx: number, wy: number) => boolean;
+  tryInterceptAt: (wx: number, wy: number) => boolean;
   markCleared: (id: string) => void;
 
   saveSnapshot: () => void;
   loadSnapshot: () => string | null;
+  hasSnapshot: () => { missionId: string; elapsed: number } | null;
+  clearSnapshot: () => void;
 }
 
 const initRuntime = (mission: MissionDef): RuntimeState => {
@@ -168,6 +178,7 @@ export const useGame = create<Store>((set, get) => ({
     const { runtime, mission, paused } = s;
     if (!runtime || !mission || paused) return;
     if (runtime.status !== "PLAYING") return;
+    const prevStatus = runtime.status;
     stepGame(runtime, mission, dt);
     // Throttle React re-renders to ~10Hz; canvas reads runtime directly via getState()
     const now = performance.now();
@@ -176,6 +187,23 @@ export const useGame = create<Store>((set, get) => ({
       // @ts-expect-error
       s._lastPush = now;
       set({ runtime: { ...runtime } });
+    }
+    // Auto-save every ~5 seconds during play; clear on win/loss.
+    // @ts-expect-error attach autosave marker
+    if (!s._lastSave || now - s._lastSave > 5000) {
+      // @ts-expect-error
+      s._lastSave = now;
+      try {
+        localStorage.setItem(
+          SAVE_KEY,
+          JSON.stringify({ missionId: mission.id, runtime })
+        );
+      } catch {}
+    }
+    if (prevStatus === "PLAYING" && runtime.status !== "PLAYING") {
+      try {
+        localStorage.removeItem(SAVE_KEY);
+      } catch {}
     }
   },
 
@@ -215,6 +243,30 @@ export const useGame = create<Store>((set, get) => ({
     return ok;
   },
 
+  tryInterceptAt: (wx, wy) => {
+    const { runtime } = get();
+    if (!runtime) return false;
+    // Pick the nearest hostile incoming projectile to the click anywhere in the
+    // world. The click is only a directional hint — selection is unrestricted so
+    // the player can always engage the closest threat regardless of click site.
+    let best = null as null | (typeof runtime.projectiles)[number];
+    let bestD = Infinity;
+    for (const p of runtime.projectiles) {
+      if (p.owner !== "ENEMY" || p.side !== "PLAYER" || p.intercepted) continue;
+      if (p.type === "AA") continue;
+      const cur = projectileCurrentPos(p);
+      const d = Math.hypot(cur.x - wx, cur.y - wy);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+    }
+    if (!best) return false;
+    const ok = launchAAIntercept(runtime, "PLAYER", best);
+    if (ok) set({ runtime: { ...runtime } });
+    return ok;
+  },
+
   markCleared: (id: string) => {
     const p = get().progress;
     if (!p.cleared.includes(id)) p.cleared.push(id);
@@ -245,6 +297,29 @@ export const useGame = create<Store>((set, get) => ({
     } catch {
       return null;
     }
+  },
+
+  hasSnapshot: () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.missionId || !parsed?.runtime) return null;
+      if (parsed.runtime.status !== "PLAYING") return null;
+      return {
+        missionId: parsed.missionId as string,
+        elapsed: parsed.runtime.elapsed ?? 0,
+      };
+    } catch {
+      return null;
+    }
+  },
+
+  clearSnapshot: () => {
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch {}
   },
 }));
 

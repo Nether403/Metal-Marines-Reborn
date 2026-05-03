@@ -1,13 +1,19 @@
-import { Link } from "wouter";
-import { MISSIONS } from "@/data/missions";
+import { Link, useLocation } from "wouter";
+import { MISSIONS, getMission } from "@/data/missions";
 import { COMMANDERS } from "@/data/commanders";
 import { useGame, isMissionUnlocked } from "@/game/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lock, CheckCircle2 } from "lucide-react";
+import { Lock, CheckCircle2, Play } from "lucide-react";
 
 export default function MissionSelect() {
   const progress = useGame((s) => s.progress);
+  const loadSnapshot = useGame((s) => s.loadSnapshot);
+  const hasSnapshot = useGame((s) => s.hasSnapshot);
+  const clearSnapshot = useGame((s) => s.clearSnapshot);
+  const [, setLocation] = useLocation();
+  const snap = hasSnapshot();
+  const snapMission = snap ? getMission(snap.missionId) : null;
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-8 overflow-y-auto">
@@ -30,6 +36,43 @@ export default function MissionSelect() {
             </Button>
           </Link>
         </header>
+
+        {snap && snapMission && (
+          <div className="flex items-center justify-between gap-4 p-3 border border-secondary/50 bg-secondary/10 rounded font-mono">
+            <div className="text-sm text-secondary">
+              <span className="uppercase tracking-wider text-xs opacity-70">
+                Saved Operation
+              </span>
+              <div className="text-base font-bold">
+                {snapMission.title} — {Math.floor(snap.elapsed / 60)}m{" "}
+                {Math.floor(snap.elapsed % 60)}s elapsed
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="font-mono border-destructive/40 text-destructive"
+                onClick={() => {
+                  clearSnapshot();
+                  setLocation("/missions");
+                }}
+              >
+                DISCARD
+              </Button>
+              <Button
+                size="sm"
+                className="font-mono bg-secondary text-secondary-foreground"
+                onClick={() => {
+                  const id = loadSnapshot();
+                  if (id) setLocation(`/play/${id}?engage=1`);
+                }}
+              >
+                <Play className="w-3.5 h-3.5 mr-1" /> RESUME
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {MISSIONS.map((mission) => {

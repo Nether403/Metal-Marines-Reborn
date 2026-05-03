@@ -20,6 +20,7 @@ import BuildPalette from "@/components/hud/BuildPalette";
 import AlertStack from "@/components/hud/AlertStack";
 import EndScreen from "@/components/hud/EndScreen";
 import Briefing from "@/components/hud/Briefing";
+import RadarPanel from "@/components/hud/RadarPanel";
 import { Button } from "@/components/ui/button";
 import { Pause, Play as PlayIcon, X } from "lucide-react";
 
@@ -54,8 +55,10 @@ export default function Play() {
   const step = useGame((s) => s.step);
   const tryBuild = useGame((s) => s.tryBuild);
   const tryFire = useGame((s) => s.tryFire);
+  const tryInterceptAt = useGame((s) => s.tryInterceptAt);
   const selectBuild = useGame((s) => s.selectBuild);
   const selectWeapon = useGame((s) => s.selectWeapon);
+  const clearSnapshot = useGame((s) => s.clearSnapshot);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
@@ -118,18 +121,24 @@ export default function Play() {
       const scaleY = WORLD_H / rect.height;
       const wx = (ev.clientX - rect.left) * scaleX;
       const wy = (ev.clientY - rect.top) * scaleY;
+      // Manual AA: click anywhere in the world (sky over our island, sea, or even
+      // over the enemy island while a missile is mid-flight) to intercept the
+      // nearest incoming hostile projectile.
+      if (rt.selectedWeapon === "AA") {
+        if (tryInterceptAt(wx, wy)) return;
+      }
       if (inIsland("PLAYER", wx, wy)) {
         if (rt.selectedBuild) {
           const t = worldToTile("PLAYER", wx, wy);
           tryBuild(t.x, t.y);
         }
       } else if (inIsland("ENEMY", wx, wy)) {
-        if (rt.selectedWeapon) {
+        if (rt.selectedWeapon && rt.selectedWeapon !== "AA") {
           tryFire(wx, wy);
         }
       }
     },
-    [tryBuild, tryFire]
+    [tryBuild, tryFire, tryInterceptAt]
   );
 
   const handleCanvasMove = useCallback((ev: React.MouseEvent<HTMLCanvasElement>) => {
@@ -229,6 +238,7 @@ export default function Play() {
             onContextMenu={handleCanvasContext}
           />
           <AlertStack state={runtime} />
+          <RadarPanel state={runtime} />
           {paused && runtime.status === "PLAYING" && (
             <div className="absolute inset-0 bg-background/70 backdrop-blur-sm flex items-center justify-center z-30">
               <div className="text-center font-mono">
@@ -261,6 +271,7 @@ export default function Play() {
             size="sm"
             className="font-mono border-destructive/40 text-destructive h-8"
             onClick={() => {
+              clearSnapshot();
               endMission();
               setLocation("/missions");
             }}
@@ -294,6 +305,7 @@ export default function Play() {
             setPaused(false);
           }}
           onAbort={() => {
+            clearSnapshot();
             endMission();
             setLocation("/missions");
           }}

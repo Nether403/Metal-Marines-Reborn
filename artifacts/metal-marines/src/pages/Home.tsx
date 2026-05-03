@@ -1,7 +1,14 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { useGame } from "@/game/store";
+import { getMission } from "@/data/missions";
 
 export default function Home() {
+  const [, setLocation] = useLocation();
+  const loadSnapshot = useGame((s) => s.loadSnapshot);
+  const hasSnapshot = useGame((s) => s.hasSnapshot);
+  const snap = hasSnapshot();
+  const snapMission = snap ? getMission(snap.missionId) : null;
   return (
     <div className="flex flex-col items-center justify-center min-h-screen relative overflow-hidden bg-background">
       {/* Animated Radar Background */}
@@ -24,6 +31,18 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col gap-4 w-full max-w-xs animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300 fill-mode-both">
+          {snap && snapMission && (
+            <Button
+              size="lg"
+              className="w-full text-lg h-14 font-mono bg-secondary hover:bg-secondary/90 text-secondary-foreground border border-secondary/60 shadow-[0_0_15px_rgba(56,189,248,0.35)]"
+              onClick={() => {
+                const id = loadSnapshot();
+                if (id) setLocation(`/play/${id}?engage=1`);
+              }}
+            >
+              RESUME :: {snapMission.title.replace("Operation: ", "")}
+            </Button>
+          )}
           <Link href="/missions">
             <Button size="lg" className="w-full text-lg h-14 font-mono bg-primary hover:bg-primary/90 text-primary-foreground border border-primary/50 shadow-[0_0_15px_rgba(0,255,128,0.3)]">
               NEW CAMPAIGN
