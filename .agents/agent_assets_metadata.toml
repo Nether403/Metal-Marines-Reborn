@@ -1,0 +1,38 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "P1PxBZxV1heFwi05Woy-n"
+uri = "file://artifacts/metal-marines/src/assets/commanders/voss.png"
+type = "image"
+title = "commander voss"
+
+[[generated]]
+id = "I_VndJAYS72jawRs_ms1-"
+uri = "file://artifacts/metal-marines/src/assets/commanders/rhe.png"
+type = "image"
+title = "commander rhe"
+
+[[generated]]
+id = "7hCG_uoXnkG8V9I0l_k-G"
+uri = "file://artifacts/metal-marines/src/assets/commanders/calder.png"
+type = "image"
+title = "commander calder"
+
+[[generated]]
+id = "INK7ctC98PWEKyZG8AYkd"
+uri = "file://artifacts/metal-marines/src/assets/commanders/iyobi.png"
+type = "image"
+title = "commander iyobi"
+
+[[generated]]
+id = "uWat_iJ8YUGrEMnHg6uOF"
+uri = "file://artifacts/metal-marines/src/assets/commanders/stryx.png"
+type = "image"
+title = "commander stryx"
+
+[[generated]]
+id = "nr5enHv3ejt_yEYkz8BzL"
+uri = "file://artifacts/metal-marines/src/assets/commanders/null.png"
+type = "image"
+title = "commander null"

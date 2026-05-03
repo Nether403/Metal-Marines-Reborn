@@ -4,6 +4,17 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+## Artifacts
+
+- `artifacts/api-server` — Fastify API server (kind: api).
+- `artifacts/mockup-sandbox` — Vite mockup sandbox (kind: design).
+- `artifacts/metal-marines` — **Metal Marines 2026**, real-time strategy
+  web game (React + Vite + zustand + HTML5 Canvas) at preview path `/`.
+  Routes: `/` home, `/missions` select, `/play/:id` combat, `/how-to-play`
+  manual. Game engine + canvas renderer in `src/game/`, HUD components in
+  `src/components/hud/`, missions in `src/data/missions.ts`. Local
+  storage stores cleared-mission progress (`mm2026.progress.v1`).
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Metal Marines 2026"
+version = "1.0.0"
+id = "artifacts/metal-marines"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23702
+
+[services.development]
+run = "pnpm --filter @workspace/metal-marines run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/metal-marines", "run", "build" ]
+publicDir = "artifacts/metal-marines/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23702"
+BASE_PATH = "/"
