@@ -89,9 +89,9 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     type: "TERRAIN_DESTABILIZER",
     name: "Destabilizer",
     hotkey: "[",
-    costFunds: 420,
-    costEnergy: 130,
-    buildTime: 8,
+    costFunds: 460,
+    costEnergy: 150,
+    buildTime: 9,
     maxHp: 190,
     description: "Mutates enemy terrain into short-lived toxic sludge chokepoints.",
     range: 520,
@@ -100,9 +100,9 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     type: "WEATHER_CONTROL",
     name: "Weather Control",
     hotkey: "]",
-    costFunds: 460,
-    costEnergy: 160,
-    buildTime: 9,
+    costFunds: 520,
+    costEnergy: 190,
+    buildTime: 10,
     maxHp: 210,
     description: "Triggers deterministic dust storms, floods, or tremors across the battlespace.",
     range: 520,
@@ -111,8 +111,8 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     type: "BIOSPHERE_ENGINE",
     name: "Biosphere Engine",
     hotkey: "\\",
-    costFunds: 340,
-    costEnergy: 120,
+    costFunds: 360,
+    costEnergy: 130,
     buildTime: 8,
     maxHp: 220,
     description: "Regenerates damaged biomes and boosts nearby economy infrastructure.",
@@ -234,17 +234,17 @@ export const EMP_DISABLE_SECONDS = 10;
 export const JAMMER_FALSE_SIGNATURE_INTERVAL = 7;
 export const TUNNEL_MOVE_MULTIPLIER = 0.82;
 export const TUNNEL_TRANSITION_SECONDS = 1.4;
-export const SEISMIC_SENSOR_RANGE = 150;
-export const SEISMIC_DETECTION_SECONDS = 4;
+export const SEISMIC_SENSOR_RANGE = 140;
+export const SEISMIC_DETECTION_SECONDS = 3.5;
 export const TUNNEL_COLLAPSE_RADIUS = 58;
-export const TUNNEL_COLLAPSE_SECONDS = 18;
-export const TOXIC_SLUDGE_SECONDS = 24;
-export const TERRAIN_DESTABILIZER_COOLDOWN = 20;
-export const WEATHER_CONTROL_COOLDOWN = 44;
+export const TUNNEL_COLLAPSE_SECONDS = 16;
+export const TOXIC_SLUDGE_SECONDS = 20;
+export const TERRAIN_DESTABILIZER_COOLDOWN = 26;
+export const WEATHER_CONTROL_COOLDOWN = 54;
 export const BIOSPHERE_ENGINE_COOLDOWN = 18;
-export const BIOSPHERE_ECONOMY_BONUS = 0.08;
-export const BIOSPHERE_REGEN_SECONDS = 38;
-export const WEATHER_DURATION_SECONDS = 24;
+export const BIOSPHERE_ECONOMY_BONUS = 0.06;
+export const BIOSPHERE_REGEN_SECONDS = 32;
+export const WEATHER_DURATION_SECONDS = 20;
 export const DUST_STORM_DRIFT_TILES = 1;
-export const DUST_STORM_MECH_SPEED_MULTIPLIER = 0.9;
-export const TREMOR_DEFENSE_PENALTY = 0.15;
+export const DUST_STORM_MECH_SPEED_MULTIPLIER = 0.92;
+export const TREMOR_DEFENSE_PENALTY = 0.12;

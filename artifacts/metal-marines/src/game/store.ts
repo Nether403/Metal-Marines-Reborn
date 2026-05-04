@@ -6,6 +6,7 @@ import type {
   RuntimeState,
   TileLayer,
   Tile,
+  ReplayCommand,
 } from "./types";
 import {
   buildBuilding,
@@ -17,10 +18,12 @@ import {
 } from "./engine";
 import { GRID_H, GRID_W } from "./constants";
 import { hashSeed } from "./rng";
+import { createReplayFrameHash } from "./replay";
 import { getMission, MISSIONS } from "@/data/missions";
 
 const PROGRESS_KEY = "mm2026.progress.v1";
 const SAVE_KEY = "mm2026.save.v1";
+const REPLAY_HASH_INTERVAL = 60;
 
 interface Progress {
   cleared: string[];
@@ -41,6 +44,13 @@ const saveProgress = (p: Progress) => {
   try {
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
   } catch {}
+};
+
+const recordReplayCommand = (runtime: RuntimeState, command: Omit<ReplayCommand, "frame">) => {
+  runtime.replay.commands.push({
+    frame: runtime.replay.frame,
+    ...command,
+  });
 };
 
 interface Store {
@@ -169,6 +179,11 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
       buildingsDestroyed: 0,
       environmentalActions: 0,
     },
+    replay: {
+      frame: 0,
+      commands: [],
+      hashes: [],
+    },
     shake: 0,
     playerIsland,
     enemyIsland,
@@ -202,6 +217,11 @@ export const useGame = create<Store>((set, get) => ({
     if (runtime.status !== "PLAYING") return;
     const prevStatus = runtime.status;
     stepGame(runtime, mission, dt);
+    runtime.replay.frame++;
+    if (runtime.replay.frame % REPLAY_HASH_INTERVAL === 0) {
+      runtime.replay.hashes.push(createReplayFrameHash(runtime, runtime.replay.frame));
+      if (runtime.replay.hashes.length > 240) runtime.replay.hashes.shift();
+    }
     // Throttle React re-renders to ~10Hz; canvas reads runtime directly via getState()
     const now = performance.now();
     // @ts-expect-error attach throttle marker
@@ -250,6 +270,9 @@ export const useGame = create<Store>((set, get) => ({
   setViewLayer: (layer) => {
     const rt = get().runtime;
     if (!rt) return;
+    if (rt.viewLayer !== layer) {
+      recordReplayCommand(rt, { type: "SET_VIEW_LAYER", payload: { layer } });
+    }
     rt.viewLayer = layer;
     set({ runtime: { ...rt } });
   },
@@ -259,6 +282,10 @@ export const useGame = create<Store>((set, get) => ({
     if (!runtime || !runtime.selectedBuild) return false;
     const ok = buildBuilding(runtime, "PLAYER", runtime.selectedBuild, x, y);
     if (ok) {
+      recordReplayCommand(runtime, {
+        type: "BUILD",
+        payload: { type: runtime.selectedBuild, x, y },
+      });
       set({ runtime: { ...runtime } });
     }
     return ok;
@@ -268,7 +295,13 @@ export const useGame = create<Store>((set, get) => ({
     const { runtime } = get();
     if (!runtime || !runtime.selectedWeapon) return false;
     const ok = launchMissile(runtime, "PLAYER", runtime.selectedWeapon, wx, wy);
-    if (ok) set({ runtime: { ...runtime } });
+    if (ok) {
+      recordReplayCommand(runtime, {
+        type: "FIRE",
+        payload: { type: runtime.selectedWeapon, wx, wy },
+      });
+      set({ runtime: { ...runtime } });
+    }
     return ok;
   },
 
@@ -292,7 +325,13 @@ export const useGame = create<Store>((set, get) => ({
     }
     if (!best) return false;
     const ok = launchAAIntercept(runtime, "PLAYER", best);
-    if (ok) set({ runtime: { ...runtime } });
+    if (ok) {
+      recordReplayCommand(runtime, {
+        type: "INTERCEPT",
+        payload: { wx, wy, targetId: best.id },
+      });
+      set({ runtime: { ...runtime } });
+    }
     return ok;
   },
 
@@ -326,6 +365,10 @@ export const useGame = create<Store>((set, get) => ({
       parsed.runtime.terrainMutations ??= [];
       parsed.runtime.stats ??= {};
       parsed.runtime.stats.environmentalActions ??= 0;
+      parsed.runtime.replay ??= { frame: 0, commands: [], hashes: [] };
+      parsed.runtime.replay.frame ??= 0;
+      parsed.runtime.replay.commands ??= [];
+      parsed.runtime.replay.hashes ??= [];
       parsed.runtime.playerIsland ??= m.playerIsland;
       parsed.runtime.enemyIsland ??= m.enemyIsland;
       parsed.runtime.playerIsland = parsed.runtime.playerIsland.map((t: Tile) => ({

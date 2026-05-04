@@ -163,13 +163,6 @@ export const buildBuilding = (
   return true;
 };
 
-declare module "./types" {
-  interface RuntimeState {
-    playerIsland: Tile[];
-    enemyIsland: Tile[];
-  }
-}
-
 const distance = (ax: number, ay: number, bx: number, by: number) =>
   Math.hypot(ax - bx, ay - by);
 

@@ -57,11 +57,18 @@ export default function HowToPlay() {
                 <li><b className="text-cyan-400">Energy Plant</b> — generates Energy.</li>
                 <li><b className="text-yellow-400">Supply Depot</b> — generates Funds.</li>
                 <li><b className="text-purple-400">Radar Array</b> — reveals the enemy island.</li>
-                <li><b className="text-orange-400">Missile Silo</b> — required to fire ICBMs, Dummies, AA.</li>
+                <li><b className="text-fuchsia-400">Radar Jammer</b> — creates false signatures and complicates intercepts.</li>
+                <li><b className="text-orange-400">Missile Silo</b> — required to fire ICBMs, Dummies, AA, and Tunnel Busters.</li>
+                <li><b className="text-sky-300">EMP Cannon</b> — disables clustered enemy systems for a short window.</li>
                 <li><b className="text-red-400">Mech Bay</b> — launches transport pods carrying Metal Marines.</li>
                 <li><b className="text-lime-300">AA Battery</b> — auto-intercepts incoming missiles.</li>
                 <li><b className="text-amber-400">Gun Turret</b> — anti-mech ground defense.</li>
                 <li><b className="text-slate-400">Land Mine</b> — hidden trap. Detonates beneath enemy mechs.</li>
+                <li><b className="text-amber-300">Tunnel Gate</b> — opens access to subterranean movement.</li>
+                <li><b className="text-cyan-200">Seismic Sensor</b> — detects underground contacts for counterfire.</li>
+                <li><b className="text-lime-300">Destabilizer</b> — mutates enemy ground into temporary toxic sludge.</li>
+                <li><b className="text-sky-300">Weather Control</b> — triggers dust storms, floods, or tremors.</li>
+                <li><b className="text-green-300">Biosphere Engine</b> — supports nearby economy and repairs damaged assets.</li>
               </ul>
             </CardContent>
           </Card>
@@ -74,19 +81,51 @@ export default function HowToPlay() {
                 <li><b className="text-slate-300">Dummy</b> — fakes a real strike to bait enemy AA, and reveals fog where it lands.</li>
                 <li><b className="text-cyan-300">AA Missile</b> — manual interceptor for an incoming threat.</li>
                 <li><b className="text-amber-300">Marine Drop</b> — pods deliver Metal Marines that walk to the nearest enemy structure and tear it apart.</li>
+                <li><b className="text-sky-300">EMP</b> — shuts down buildings in the blast zone.</li>
+                <li><b className="text-orange-300">Tunnel Buster</b> — collapses tunnel cells and destroys exposed underground units.</li>
               </ul>
             </CardContent>
           </Card>
 
           <Card className="bg-card/50 border-primary/20">
             <CardContent className="p-6 space-y-3">
-              <h2 className="text-lg font-bold text-secondary font-mono uppercase">05 :: Controls</h2>
+              <h2 className="text-lg font-bold text-secondary font-mono uppercase">05 :: Subterranean Warfare</h2>
+              <ul className="text-sm space-y-2">
+                <li>Press <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono">V</kbd> to toggle the surface and tunnel views.</li>
+                <li>Tunnel Gates connect nearby tunnel cells. Metal Marines can use them to bypass surface chokepoints.</li>
+                <li>Underground mechs are hidden unless you are viewing tunnels or they are exposed by Seismic Sensors.</li>
+                <li>Tunnel Busters collapse tunnel cells for a limited time. Any underground unit in the blast zone is lost.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 border-primary/20">
+            <CardContent className="p-6 space-y-3">
+              <h2 className="text-lg font-bold text-secondary font-mono uppercase">06 :: Ecological Warfare</h2>
+              <ul className="text-sm space-y-2">
+                <li><b className="text-lime-300">Toxic sludge</b> blocks surface movement and construction until it decays.</li>
+                <li><b className="text-yellow-300">Dust storms</b> slow surface mech movement and reduce battlefield clarity.</li>
+                <li><b className="text-sky-300">Floods</b> further slow surface movement across the island grid.</li>
+                <li><b className="text-amber-300">Tremors</b> make defensive fire less reliable while active.</li>
+                <li>Biosphere Engines shorten harmful terrain effects and improve nearby resource generation.</li>
+              </ul>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 border-primary/20">
+            <CardContent className="p-6 space-y-3">
+              <h2 className="text-lg font-bold text-secondary font-mono uppercase">07 :: Controls</h2>
               <div className="grid grid-cols-2 gap-3 text-sm font-mono bg-black/50 p-4 rounded border border-border">
-                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">1</kbd>–<kbd className="bg-muted px-1.5 py-0.5 rounded">8</kbd> Select Building</div>
+                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">1</kbd>–<kbd className="bg-muted px-1.5 py-0.5 rounded">0</kbd> Select core buildings</div>
+                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">-</kbd>/<kbd className="bg-muted px-1.5 py-0.5 rounded">=</kbd> Tunnel systems</div>
+                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">[</kbd>/<kbd className="bg-muted px-1.5 py-0.5 rounded">]</kbd>/<kbd className="bg-muted px-1.5 py-0.5 rounded">\</kbd> Ecology systems</div>
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">Q</kbd> Fire ICBM</div>
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">W</kbd> Fire Dummy</div>
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">E</kbd> Manual AA</div>
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">R</kbd> Marine Drop</div>
+                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">T</kbd> EMP</div>
+                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">Y</kbd> Tunnel Buster</div>
+                <div><kbd className="bg-muted px-1.5 py-0.5 rounded">V</kbd> Surface/Tunnel View</div>
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">Space</kbd> Pause</div>
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">Esc</kbd> Cancel selection</div>
                 <div>Click LEFT to build · RIGHT to fire</div>

@@ -106,6 +106,28 @@ export interface TerrainMutation {
   sourceBuilding: string;
 }
 
+export type ReplayCommandType = "BUILD" | "FIRE" | "INTERCEPT" | "SELECT_BUILD" | "SELECT_WEAPON" | "SET_VIEW_LAYER";
+
+export interface ReplayCommand {
+  frame: number;
+  type: ReplayCommandType;
+  payload: Record<string, string | number | boolean | null>;
+}
+
+export interface ReplayFrameHash {
+  frame: number;
+  elapsed: number;
+  hash: string;
+}
+
+export interface ReplaySnapshot {
+  version: 1;
+  missionId: string | null;
+  seed: number;
+  commands: ReplayCommand[];
+  hashes: ReplayFrameHash[];
+}
+
 export interface AlertItem {
   id: string;
   text: string;
@@ -191,6 +213,8 @@ export interface RuntimeState {
   projectiles: Projectile[];
   mechs: Mech[];
   particles: Particle[];
+  playerIsland: Tile[];
+  enemyIsland: Tile[];
   fogPlayer: boolean[];
   fogEnemy: boolean[];
   alerts: AlertItem[];
@@ -224,6 +248,11 @@ export interface RuntimeState {
     buildingsLost: number;
     buildingsDestroyed: number;
     environmentalActions: number;
+  };
+  replay: {
+    frame: number;
+    commands: ReplayCommand[];
+    hashes: ReplayFrameHash[];
   };
   shake: number;
 }
