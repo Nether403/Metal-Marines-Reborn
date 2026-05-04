@@ -1,10 +1,17 @@
 import { GRID_H, GRID_W } from "./constants";
-import type { Building, Owner, Position, Tile } from "./types";
+import type { Building, Owner, Position, Tile, TileLayer } from "./types";
 
-const TERRAIN_COST: Record<Tile["terrain"], number> = {
+const SURFACE_TERRAIN_COST: Record<Tile["terrain"], number> = {
   GRASS: 1,
   FOREST: 1.5,
   MOUNTAIN: Infinity,
+  WATER: Infinity,
+};
+
+const UNDERGROUND_TERRAIN_COST: Record<Tile["terrain"], number> = {
+  GRASS: 1,
+  FOREST: 1.1,
+  MOUNTAIN: 2.4,
   WATER: Infinity,
 };
 
@@ -31,10 +38,21 @@ interface PathNode {
 export const isTileInBounds = (x: number, y: number): boolean =>
   x >= 0 && y >= 0 && x < GRID_W && y < GRID_H;
 
-export const terrainMoveCost = (tiles: Tile[], x: number, y: number): number => {
+export const terrainMoveCost = (
+  tiles: Tile[],
+  x: number,
+  y: number,
+  layer: TileLayer = "SURFACE",
+  now = 0
+): number => {
   const tile = getPathTile(tiles, x, y);
   if (!tile) return Infinity;
-  return TERRAIN_COST[tile.terrain];
+  if (layer === "UNDERGROUND") {
+    if (!tile.tunnel?.open) return Infinity;
+    if ((tile.tunnel.collapsedUntil ?? 0) > now) return Infinity;
+    return UNDERGROUND_TERRAIN_COST[tile.terrain];
+  }
+  return SURFACE_TERRAIN_COST[tile.terrain];
 };
 
 export const isTileOccupied = (
@@ -59,13 +77,20 @@ export const isPathableTile = (
   side: Owner,
   x: number,
   y: number,
-  options: { ignoreBuildingId?: string; allowOccupiedStart?: boolean; start?: Position } = {}
+  options: {
+    ignoreBuildingId?: string;
+    allowOccupiedStart?: boolean;
+    start?: Position;
+    layer?: TileLayer;
+    now?: number;
+  } = {}
 ): boolean => {
   if (!isTileInBounds(x, y)) return false;
-  const cost = terrainMoveCost(tiles, x, y);
+  const layer = options.layer ?? "SURFACE";
+  const cost = terrainMoveCost(tiles, x, y, layer, options.now ?? 0);
   if (!Number.isFinite(cost)) return false;
   const isStart = options.start?.x === x && options.start?.y === y;
-  if (!options.allowOccupiedStart || !isStart) {
+  if (layer === "SURFACE" && (!options.allowOccupiedStart || !isStart)) {
     if (isTileOccupied(buildings, side, x, y, options.ignoreBuildingId)) return false;
   }
   return true;
@@ -90,10 +115,15 @@ export const findPath = (
   side: Owner,
   start: Position,
   goals: Position[],
-  options: { maxIterations?: number; ignoreBuildingId?: string } = {}
+  options: { maxIterations?: number; ignoreBuildingId?: string; layer?: TileLayer; now?: number } = {}
 ): Position[] => {
+  const layer = options.layer ?? "SURFACE";
   const validGoals = goals.filter((g) =>
-    isPathableTile(tiles, buildings, side, g.x, g.y, { ignoreBuildingId: options.ignoreBuildingId })
+    isPathableTile(tiles, buildings, side, g.x, g.y, {
+      ignoreBuildingId: options.ignoreBuildingId,
+      layer,
+      now: options.now,
+    })
   );
   if (!validGoals.length) return [];
 
@@ -127,11 +157,13 @@ export const findPath = (
           ignoreBuildingId: options.ignoreBuildingId,
           allowOccupiedStart: true,
           start,
+          layer,
+          now: options.now,
         })
       ) {
         continue;
       }
-      const moveCost = terrainMoveCost(tiles, nx, ny);
+      const moveCost = terrainMoveCost(tiles, nx, ny, layer, options.now ?? 0);
       const g = current.g + moveCost;
       if (g >= (bestG.get(key) ?? Infinity)) continue;
       bestG.set(key, g);
@@ -156,5 +188,6 @@ export const findPathToAdjacentBuilding = (
   buildings: Building[],
   side: Owner,
   start: Position,
-  target: Building
-): Position[] => findPath(tiles, buildings, side, start, adjacentTiles(target.pos));
+  target: Building,
+  options: { layer?: TileLayer; now?: number } = {}
+): Position[] => findPath(tiles, buildings, side, start, adjacentTiles(target.pos), options);

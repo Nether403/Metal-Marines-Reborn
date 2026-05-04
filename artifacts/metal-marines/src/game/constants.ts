@@ -64,6 +64,27 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     description: "Electronic warfare array. Creates uncertain radar signatures and degrades enemy intercept confidence.",
     range: 260,
   },
+  TUNNEL_ENTRANCE: {
+    type: "TUNNEL_ENTRANCE",
+    name: "Tunnel Gate",
+    hotkey: "-",
+    costFunds: 240,
+    costEnergy: 70,
+    buildTime: 7,
+    maxHp: 220,
+    description: "Links mechs into the subterranean grid, bypassing normal radar and surface chokepoints.",
+  },
+  SEISMIC_SENSOR: {
+    type: "SEISMIC_SENSOR",
+    name: "Seismic Sensor",
+    hotkey: "=",
+    costFunds: 170,
+    costEnergy: 55,
+    buildTime: 5,
+    maxHp: 150,
+    description: "Detects underground movement and exposes tunnel incursions for counter-battery fire.",
+    range: 150,
+  },
   MISSILE_LAUNCHER: {
     type: "MISSILE_LAUNCHER",
     name: "Missile Silo",
@@ -144,6 +165,8 @@ export const BUILDING_COST_SCALING: Partial<
   METAL_MARINE_BASE: { freeCount: 1, rate: 0.28, exponent: 1.24, maxMultiplier: 3 },
   RADAR_JAMMER: { freeCount: 1, rate: 0.24, exponent: 1.2, maxMultiplier: 2.6 },
   EMP_CANNON: { freeCount: 1, rate: 0.26, exponent: 1.22, maxMultiplier: 2.8 },
+  TUNNEL_ENTRANCE: { freeCount: 1, rate: 0.32, exponent: 1.24, maxMultiplier: 3 },
+  SEISMIC_SENSOR: { freeCount: 1, rate: 0.18, exponent: 1.18, maxMultiplier: 2.2 },
 };
 
 export const WEAPON_COSTS: Record<ProjectileType, { funds: number; energy: number }> = {
@@ -152,6 +175,7 @@ export const WEAPON_COSTS: Record<ProjectileType, { funds: number; energy: numbe
   AA: { funds: 30, energy: 20 },
   TRANSPORT_POD: { funds: 220, energy: 80 },
   EMP: { funds: 120, energy: 120 },
+  TUNNEL_BUSTER: { funds: 140, energy: 90 },
 };
 
 export const WEAPON_LABELS: Record<ProjectileType, { name: string; hotkey: string; desc: string }> = {
@@ -160,6 +184,7 @@ export const WEAPON_LABELS: Record<ProjectileType, { name: string; hotkey: strin
   AA: { name: "AA Missile", hotkey: "E", desc: "Manual intercept of an enemy missile." },
   TRANSPORT_POD: { name: "Marine Drop", hotkey: "R", desc: "Launch a Metal Marine pod." },
   EMP: { name: "EMP", hotkey: "T", desc: "Disable buildings near the strike zone for a short window." },
+  TUNNEL_BUSTER: { name: "Buster", hotkey: "Y", desc: "Collapse tunnel tiles and destroy exposed underground units." },
 };
 
 export const ICBM_DAMAGE = 280;
@@ -171,3 +196,9 @@ export const MECH_ATTACK_COOLDOWN = 0.7;
 export const EMP_SPLASH = 72;
 export const EMP_DISABLE_SECONDS = 10;
 export const JAMMER_FALSE_SIGNATURE_INTERVAL = 7;
+export const TUNNEL_MOVE_MULTIPLIER = 0.82;
+export const TUNNEL_TRANSITION_SECONDS = 1.4;
+export const SEISMIC_SENSOR_RANGE = 150;
+export const SEISMIC_DETECTION_SECONDS = 4;
+export const TUNNEL_COLLAPSE_RADIUS = 58;
+export const TUNNEL_COLLAPSE_SECONDS = 18;

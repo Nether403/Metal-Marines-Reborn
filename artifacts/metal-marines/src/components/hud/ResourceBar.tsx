@@ -14,6 +14,9 @@ export default function ResourceBar({ state }: { state: RuntimeState }) {
   const disabledCount = state.buildings.filter(
     (b) => b.side === "PLAYER" && b.hp > 0 && (b.disabledUntil ?? 0) > state.elapsed
   ).length;
+  const undergroundContacts = state.mechs.filter(
+    (m) => m.side === "PLAYER" && (m.layer ?? "SURFACE") === "UNDERGROUND"
+  ).length;
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-black/60 border-b border-primary/30 font-mono text-sm">
       <div className="flex items-center gap-2 text-yellow-300">
@@ -45,6 +48,11 @@ export default function ResourceBar({ state }: { state: RuntimeState }) {
       {disabledCount > 0 && (
         <div className="text-cyan-200 bg-cyan-500/10 border border-cyan-400/30 px-2 py-0.5 rounded uppercase text-xs">
           EMP LOCK {disabledCount}
+        </div>
+      )}
+      {state.viewLayer === "UNDERGROUND" && (
+        <div className="text-amber-200 bg-amber-500/10 border border-amber-400/30 px-2 py-0.5 rounded uppercase text-xs">
+          TUNNEL VIEW {undergroundContacts ? `· ${undergroundContacts} CONTACT` : ""}
         </div>
       )}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">

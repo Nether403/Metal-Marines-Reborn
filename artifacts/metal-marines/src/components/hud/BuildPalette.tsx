@@ -9,6 +9,8 @@ const buildOrder: BuildingType[] = [
   "SUPPLY_DEPOT",
   "RADAR",
   "RADAR_JAMMER",
+  "TUNNEL_ENTRANCE",
+  "SEISMIC_SENSOR",
   "MISSILE_LAUNCHER",
   "EMP_CANNON",
   "METAL_MARINE_BASE",
@@ -17,7 +19,7 @@ const buildOrder: BuildingType[] = [
   "LAND_MINE",
 ];
 
-const weaponOrder: ProjectileType[] = ["ICBM", "DUMMY", "AA", "TRANSPORT_POD", "EMP"];
+const weaponOrder: ProjectileType[] = ["ICBM", "DUMMY", "AA", "TRANSPORT_POD", "EMP", "TUNNEL_BUSTER"];
 
 export default function BuildPalette({ state }: { state: RuntimeState }) {
   const selectBuild = useGame((s) => s.selectBuild);
@@ -42,7 +44,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
           <div className="text-xs uppercase tracking-widest text-primary/80 mb-2">
             CONSTRUCT
           </div>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-6 gap-1.5">
             {buildOrder.map((t) => {
               const spec = BUILDINGS[t];
               const cost = getBuildingCost(state.buildings, "PLAYER", t);
@@ -77,7 +79,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
           <div className="text-xs uppercase tracking-widest text-destructive/80 mb-2">
             WEAPONS
           </div>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-6 gap-1.5">
             {weaponOrder.map((t) => {
               const cost = WEAPON_COSTS[t];
               const lbl = WEAPON_LABELS[t];
@@ -113,7 +115,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
         <span>
           Click LEFT island to BUILD. Click RIGHT island to FIRE. Right-click or ESC to cancel.
         </span>
-        <span>1-8 build · QWER weapons · SPACE pause</span>
+        <span>1-0,-,= build · QWERTY weapons · V layer · SPACE pause</span>
       </div>
     </div>
   );

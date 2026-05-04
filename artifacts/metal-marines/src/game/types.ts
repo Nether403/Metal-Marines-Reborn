@@ -1,18 +1,21 @@
 export type TerrainType = "GRASS" | "FOREST" | "MOUNTAIN" | "WATER";
 export type Owner = "PLAYER" | "ENEMY";
+export type TileLayer = "SURFACE" | "UNDERGROUND";
 export type BuildingType =
   | "HQ"
   | "ENERGY_PLANT"
   | "SUPPLY_DEPOT"
   | "RADAR"
   | "RADAR_JAMMER"
+  | "TUNNEL_ENTRANCE"
+  | "SEISMIC_SENSOR"
   | "MISSILE_LAUNCHER"
   | "EMP_CANNON"
   | "METAL_MARINE_BASE"
   | "AA_GUN"
   | "GUN_TURRET"
   | "LAND_MINE";
-export type ProjectileType = "ICBM" | "DUMMY" | "AA" | "TRANSPORT_POD" | "EMP";
+export type ProjectileType = "ICBM" | "DUMMY" | "AA" | "TRANSPORT_POD" | "EMP" | "TUNNEL_BUSTER";
 
 export interface Position {
   x: number;
@@ -23,6 +26,11 @@ export interface Tile {
   x: number;
   y: number;
   terrain: TerrainType;
+  elevation?: number;
+  tunnel?: {
+    open: boolean;
+    collapsedUntil?: number;
+  };
 }
 
 export interface Building {
@@ -63,6 +71,9 @@ export interface Mech {
   path?: Position[];
   pathTargetId?: string;
   waypointIndex?: number;
+  layer?: TileLayer;
+  detectedUntil?: number;
+  layerTransitionRemaining?: number;
   hp: number;
   maxHp: number;
   state: "LANDING" | "WALKING" | "ATTACKING";
@@ -86,7 +97,7 @@ export interface AlertItem {
   text: string;
   level: "info" | "warn" | "crit";
   ts: number;
-  category?: "incoming" | "economy" | "ewarfare" | "combat";
+  category?: "incoming" | "economy" | "ewarfare" | "combat" | "subterranean";
   worldPos?: Position;
   side?: Owner;
   severity?: number;
@@ -171,6 +182,7 @@ export interface RuntimeState {
   alerts: AlertItem[];
   selectedBuild: BuildingType | null;
   selectedWeapon: ProjectileType | null;
+  viewLayer: TileLayer;
   aiState: {
     phase: "ECO" | "ARMY" | "ASSAULT";
     nextActionAt: number;

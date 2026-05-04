@@ -48,7 +48,9 @@ const drawIsland = (
   side: Owner,
   tiles: Tile[],
   fog: boolean[] | null,
-  t: number
+  t: number,
+  underground: boolean,
+  now: number
 ) => {
   const ox = islandOriginX(side);
   // Backdrop
@@ -94,6 +96,26 @@ const drawIsland = (
         ctx.fill();
       } else if (tile.terrain === "WATER") {
         drawWaterShimmer(ctx, px, py, t);
+      }
+
+      if (underground) {
+        const tunnelOpen = tile.tunnel?.open;
+        const collapsed = (tile.tunnel?.collapsedUntil ?? 0) > now;
+        ctx.fillStyle = tunnelOpen
+          ? collapsed
+            ? "rgba(127,29,29,0.55)"
+            : "rgba(217,119,6,0.38)"
+          : "rgba(2,6,23,0.68)";
+        ctx.fillRect(px, py, TILE_PX, TILE_PX);
+        if (tunnelOpen && !collapsed) {
+          ctx.strokeStyle = "rgba(251,191,36,0.45)";
+          ctx.beginPath();
+          ctx.moveTo(px + 8, py + TILE_PX / 2);
+          ctx.lineTo(px + TILE_PX - 8, py + TILE_PX / 2);
+          ctx.moveTo(px + TILE_PX / 2, py + 8);
+          ctx.lineTo(px + TILE_PX / 2, py + TILE_PX - 8);
+          ctx.stroke();
+        }
       }
     }
   }
@@ -272,6 +294,14 @@ const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
 
 const drawMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
   const c = m.owner === "PLAYER" ? "#22c55e" : "#f87171";
+  const underground = (m.layer ?? "SURFACE") === "UNDERGROUND";
+  ctx.globalAlpha = underground ? 0.62 : 1;
+  if (underground) {
+    ctx.strokeStyle = m.detectedUntil ? "#fbbf24" : "rgba(251,191,36,0.45)";
+    ctx.beginPath();
+    ctx.arc(m.pos.x, m.pos.y, 11, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.fillStyle = c;
   ctx.fillRect(m.pos.x - 6, m.pos.y - 8, 12, 12);
   ctx.fillRect(m.pos.x - 4, m.pos.y + 4, 3, 6);
@@ -285,6 +315,7 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
     ctx.fillStyle = "#22c55e";
     ctx.fillRect(m.pos.x - 8, m.pos.y - 14, 16 * (m.hp / m.maxHp), 2);
   }
+  ctx.globalAlpha = 1;
 };
 
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
@@ -372,8 +403,9 @@ export const renderFrame = (
   ctx.fillStyle = "#020617";
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  drawIsland(ctx, "PLAYER", state.playerIsland, null, time);
-  drawIsland(ctx, "ENEMY", state.enemyIsland, state.fogEnemy, time);
+  const underground = state.viewLayer === "UNDERGROUND";
+  drawIsland(ctx, "PLAYER", state.playerIsland, null, time, underground, state.elapsed);
+  drawIsland(ctx, "ENEMY", state.enemyIsland, state.fogEnemy, time, underground, state.elapsed);
   drawSeaBetween(ctx, time);
 
   // Buildings
@@ -383,7 +415,10 @@ export const renderFrame = (
     drawBuilding(ctx, b, hidden, state.elapsed);
   }
   // Mechs
-  for (const m of state.mechs) drawMech(ctx, m);
+  for (const m of state.mechs) {
+    const isUnderground = (m.layer ?? "SURFACE") === "UNDERGROUND";
+    if (!isUnderground || underground || (m.detectedUntil ?? 0) > state.elapsed) drawMech(ctx, m);
+  }
   // Projectiles
   for (const p of state.projectiles) drawProjectile(ctx, p);
   // Particles on top

@@ -13,8 +13,14 @@ import {
   MECH_HP,
   MECH_SPEED,
   JAMMER_FALSE_SIGNATURE_INTERVAL,
+  SEISMIC_DETECTION_SECONDS,
+  SEISMIC_SENSOR_RANGE,
   SKY_GAP_PX,
   TILE_PX,
+  TUNNEL_COLLAPSE_RADIUS,
+  TUNNEL_COLLAPSE_SECONDS,
+  TUNNEL_MOVE_MULTIPLIER,
+  TUNNEL_TRANSITION_SECONDS,
   WEAPON_COSTS,
 } from "./constants";
 import { getBuildingCost } from "./economy";
@@ -32,6 +38,7 @@ import type {
   ProjectileType,
   RuntimeState,
   Tile,
+  TileLayer,
 } from "./types";
 import { sfx } from "@/lib/sfx";
 
@@ -139,6 +146,7 @@ export const buildBuilding = (
     buildTimeTotal: spec.buildTime,
     cooldown: 0,
   });
+  if (type === "TUNNEL_ENTRANCE") carveTunnelAround(state, side, { x, y }, 2);
   if (side === "PLAYER") sfx("place_building");
   return true;
 };
@@ -164,6 +172,82 @@ const clearMechPath = (m: Mech) => {
   m.waypointIndex = 0;
 };
 
+const islandTiles = (state: RuntimeState, side: Owner): Tile[] =>
+  side === "PLAYER" ? state.playerIsland : state.enemyIsland;
+
+const isTunnelOpen = (tiles: Tile[], pos: Position, now: number): boolean => {
+  const tile = getTile(tiles, pos.x, pos.y);
+  return !!tile?.tunnel?.open && (tile.tunnel.collapsedUntil ?? 0) <= now;
+};
+
+const hasActiveTunnelEntranceNear = (
+  state: RuntimeState,
+  side: Owner,
+  pos: Position,
+  radiusTiles = 2
+): boolean =>
+  state.buildings.some(
+    (b) =>
+      b.side === side &&
+      b.type === "TUNNEL_ENTRANCE" &&
+      isBuildingActive(b, state.elapsed) &&
+      Math.abs(b.pos.x - pos.x) + Math.abs(b.pos.y - pos.y) <= radiusTiles
+  );
+
+const carveTunnelAround = (state: RuntimeState, side: Owner, center: Position, radiusTiles = 2) => {
+  const tiles = islandTiles(state, side);
+  for (let y = center.y - radiusTiles; y <= center.y + radiusTiles; y++) {
+    for (let x = center.x - radiusTiles; x <= center.x + radiusTiles; x++) {
+      if (x < 1 || y < 1 || x >= GRID_W - 1 || y >= GRID_H - 1) continue;
+      if (Math.abs(x - center.x) + Math.abs(y - center.y) > radiusTiles + 1) continue;
+      const tile = getTile(tiles, x, y);
+      if (!tile || tile.terrain === "WATER") continue;
+      tile.tunnel = { open: true, collapsedUntil: Math.max(0, tile.tunnel?.collapsedUntil ?? 0) };
+    }
+  }
+};
+
+const collapseTunnelsAt = (state: RuntimeState, side: Owner, wx: number, wy: number) => {
+  const tiles = islandTiles(state, side);
+  let collapsed = 0;
+  for (const tile of tiles) {
+    if (!tile.tunnel?.open) continue;
+    const tw = tileToWorld(side, tile.x, tile.y);
+    if (distance(tw.x, tw.y, wx, wy) <= TUNNEL_COLLAPSE_RADIUS) {
+      tile.tunnel.collapsedUntil = state.elapsed + TUNNEL_COLLAPSE_SECONDS;
+      collapsed++;
+    }
+  }
+  for (const m of state.mechs) {
+    if (m.side !== side || (m.layer ?? "SURFACE") !== "UNDERGROUND") continue;
+    if (distance(m.pos.x, m.pos.y, wx, wy) <= TUNNEL_COLLAPSE_RADIUS) {
+      m.hp = 0;
+      clearMechPath(m);
+    }
+  }
+  for (const m of state.mechs) {
+    if (m.side === side) clearMechPath(m);
+  }
+  state.alerts.push({
+    id: uid("a"),
+    text: `TUNNEL COLLAPSE: ${collapsed} CELLS SEALED`,
+    level: side === "PLAYER" ? "crit" : "info",
+    ts: 3.5,
+    category: "subterranean",
+    side,
+    worldPos: { x: wx, y: wy },
+    suggestion: collapsed ? "Underground units in the blast zone are lost." : "No tunnel voids detected.",
+  });
+  spawnExplosion(state, side, wx, wy, true);
+};
+
+const setMechLayer = (m: Mech, layer: TileLayer) => {
+  if ((m.layer ?? "SURFACE") === layer || (m.layerTransitionRemaining ?? 0) > 0) return;
+  m.layer = layer;
+  m.layerTransitionRemaining = TUNNEL_TRANSITION_SECONDS;
+  clearMechPath(m);
+};
+
 export const launchMissile = (
   state: RuntimeState,
   side: Owner,
@@ -178,7 +262,7 @@ export const launchMissile = (
   if (state[fundsRef] < cost.funds || state[energyRef] < cost.energy) return false;
 
   // Need a launcher / mech bay alive on this side
-  const requiresLauncher = type === "ICBM" || type === "DUMMY" || type === "AA";
+  const requiresLauncher = type === "ICBM" || type === "DUMMY" || type === "AA" || type === "TUNNEL_BUSTER";
   const requiresMechBay = type === "TRANSPORT_POD";
   const requiresEmp = type === "EMP";
   const has = state.buildings.some(
@@ -206,7 +290,7 @@ export const launchMissile = (
   const start = tileToWorld(side, launcher.pos.x, launcher.pos.y);
   const target = side === "PLAYER" ? "ENEMY" : "PLAYER";
 
-  const speed = type === "TRANSPORT_POD" ? 90 : type === "AA" ? 280 : type === "EMP" ? 160 : 130;
+  const speed = type === "TRANSPORT_POD" ? 90 : type === "AA" ? 280 : type === "EMP" ? 160 : type === "TUNNEL_BUSTER" ? 145 : 130;
   const proj: Projectile = {
     id: uid("p"),
     type,
@@ -551,6 +635,8 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
         explodeAt(state, p.side, p.targetWX, p.targetWY, ICBM_DAMAGE, ICBM_SPLASH, true);
       } else if (p.type === "EMP") {
         applyEmpAt(state, p.side, p.targetWX, p.targetWY);
+      } else if (p.type === "TUNNEL_BUSTER") {
+        collapseTunnelsAt(state, p.side, p.targetWX, p.targetWY);
       } else if (p.type === "DUMMY") {
         spawnExplosion(state, p.side, p.targetWX, p.targetWY, false);
         const ti = worldToTile(p.side, p.targetWX, p.targetWY);
@@ -579,11 +665,36 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
 const tickMechs = (state: RuntimeState, dt: number) => {
   for (let i = state.mechs.length - 1; i >= 0; i--) {
     const m = state.mechs[i];
+    m.layer ??= "SURFACE";
+    if ((m.layerTransitionRemaining ?? 0) > 0) {
+      m.layerTransitionRemaining = Math.max(0, (m.layerTransitionRemaining ?? 0) - dt);
+      continue;
+    }
     if (m.hp <= 0) {
       spawnExplosion(state, m.side, m.pos.x, m.pos.y, true);
       state.mechs.splice(i, 1);
       continue;
     }
+    const currentTile = worldToTile(m.side, m.pos.x, m.pos.y);
+    const tiles = m.side === "PLAYER" ? state.playerIsland : state.enemyIsland;
+    const layer = m.layer ?? "SURFACE";
+    if (layer === "UNDERGROUND" && !isTunnelOpen(tiles, currentTile, state.elapsed)) {
+      m.hp = 0;
+      clearMechPath(m);
+      continue;
+    }
+
+    const shouldGoUnderground =
+      layer === "SURFACE" &&
+      isTunnelOpen(tiles, currentTile, state.elapsed) &&
+      hasActiveTunnelEntranceNear(state, m.side, currentTile) &&
+      (m.owner === "PLAYER" || state.elapsed > 50);
+    const shouldSurface =
+      layer === "UNDERGROUND" &&
+      hasActiveTunnelEntranceNear(state, m.side, currentTile, 1) &&
+      state.buildings.some((b) => b.side === m.side && b.hp > 0 && distance(tileToWorld(b.side, b.pos.x, b.pos.y).x, tileToWorld(b.side, b.pos.x, b.pos.y).y, m.pos.x, m.pos.y) <= MECH_ATTACK_RANGE * 1.5);
+    if (shouldGoUnderground) setMechLayer(m, "UNDERGROUND");
+    if (shouldSurface) setMechLayer(m, "SURFACE");
 
     // Find nearest enemy building on this side
     let target: Building | undefined;
@@ -601,7 +712,7 @@ const tickMechs = (state: RuntimeState, dt: number) => {
 
     // Land mines: detonate beneath us
     for (const b of state.buildings) {
-      if (b.side === m.side && b.type === "LAND_MINE" && b.hp > 0) {
+      if (layer === "SURFACE" && b.side === m.side && b.type === "LAND_MINE" && b.hp > 0) {
         const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
         if (distance(bw.x, bw.y, m.pos.x, m.pos.y) < 18) {
           const dmg = BUILDINGS.LAND_MINE.damage ?? 60;
@@ -616,6 +727,7 @@ const tickMechs = (state: RuntimeState, dt: number) => {
     // Gun turrets shoot at us
     for (const b of state.buildings) {
       if (b.side !== m.side || b.type !== "GUN_TURRET" || b.hp <= 0) continue;
+      if (layer === "UNDERGROUND" && (m.detectedUntil ?? 0) <= state.elapsed) continue;
       if (!isBuildingActive(b, state.elapsed) || b.cooldown > 0) continue;
       const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
       const r = BUILDINGS.GUN_TURRET.range ?? 110;
@@ -644,18 +756,21 @@ const tickMechs = (state: RuntimeState, dt: number) => {
     const d = Math.hypot(dx, dy);
     if (d > MECH_ATTACK_RANGE) {
       m.state = "WALKING";
-      const currentTile = worldToTile(m.side, m.pos.x, m.pos.y);
-      const tiles = m.side === "PLAYER" ? state.playerIsland : state.enemyIsland;
       const nextWaypoint = m.path?.[m.waypointIndex ?? 0];
       const waypointBlocked = nextWaypoint
         ? !isPathableTile(tiles, state.buildings, m.side, nextWaypoint.x, nextWaypoint.y, {
             allowOccupiedStart: true,
             start: currentTile,
+            layer,
+            now: state.elapsed,
           })
         : false;
       const pathExhausted = !!m.path?.length && (m.waypointIndex ?? 0) >= m.path.length;
       if (m.pathTargetId !== target.id || !m.path?.length || waypointBlocked || pathExhausted) {
-        m.path = findPathToAdjacentBuilding(tiles, state.buildings, m.side, currentTile, target);
+        m.path = findPathToAdjacentBuilding(tiles, state.buildings, m.side, currentTile, target, {
+          layer,
+          now: state.elapsed,
+        });
         m.pathTargetId = target.id;
         m.waypointIndex = m.path.length > 1 ? 1 : 0;
       }
@@ -666,7 +781,7 @@ const tickMechs = (state: RuntimeState, dt: number) => {
         const wdx = ww.x - m.pos.x;
         const wdy = ww.y - m.pos.y;
         const wd = Math.hypot(wdx, wdy);
-        const step = MECH_SPEED * dt;
+        const step = MECH_SPEED * (layer === "UNDERGROUND" ? TUNNEL_MOVE_MULTIPLIER : 1) * dt;
         if (wd <= step || wd < 1) {
           m.pos.x = ww.x;
           m.pos.y = ww.y;
@@ -701,6 +816,37 @@ const tickMechs = (state: RuntimeState, dt: number) => {
           if (target.side === "PLAYER") state.stats.buildingsLost++;
           else state.stats.buildingsDestroyed++;
         }
+      }
+    }
+  }
+};
+
+const tickSeismicSensors = (state: RuntimeState) => {
+  const sensors = state.buildings.filter(
+    (b) => b.type === "SEISMIC_SENSOR" && isBuildingActive(b, state.elapsed)
+  );
+  if (!sensors.length) return;
+  for (const m of state.mechs) {
+    if ((m.layer ?? "SURFACE") !== "UNDERGROUND") continue;
+    for (const sensor of sensors) {
+      if (sensor.side !== m.side) continue;
+      const sw = tileToWorld(sensor.side, sensor.pos.x, sensor.pos.y);
+      if (distance(sw.x, sw.y, m.pos.x, m.pos.y) <= SEISMIC_SENSOR_RANGE) {
+        m.detectedUntil = Math.max(m.detectedUntil ?? 0, state.elapsed + SEISMIC_DETECTION_SECONDS);
+        if (sensor.side === "PLAYER") {
+          const t = worldToTile(sensor.side, m.pos.x, m.pos.y);
+          state.alerts.push({
+            id: uid("a"),
+            text: "SEISMIC CONTACT BELOW GRID",
+            level: "warn",
+            ts: 2.5,
+            category: "subterranean",
+            side: sensor.side,
+            worldPos: { ...m.pos },
+            suggestion: `Target tile ${t.x + 1},${t.y + 1} with a tunnel buster.`,
+          });
+        }
+        break;
       }
     }
   }
@@ -746,6 +892,8 @@ const countBuildingsByType = (buildings: Building[], side: Owner): Record<Buildi
     SUPPLY_DEPOT: 0,
     RADAR: 0,
     RADAR_JAMMER: 0,
+    TUNNEL_ENTRANCE: 0,
+    SEISMIC_SENSOR: 0,
     MISSILE_LAUNCHER: 0,
     EMP_CANNON: 0,
     METAL_MARINE_BASE: 0,
@@ -817,6 +965,8 @@ const scoreAiActions = (
   addBuild("RADAR", counts.RADAR ? 8 : 45 + Object.keys(memory.seenPlayerBuildings).length * 2, "target-intel");
   addBuild("RADAR_JAMMER", counts.RADAR_JAMMER ? 12 : 42 + playerAa * 9 + agg * 20, "jam-defense");
   addBuild("EMP_CANNON", counts.EMP_CANNON ? 10 : 48 + playerAa * 6 + (playerPower ? 12 : 0), "disable-grid");
+  addBuild("TUNNEL_ENTRANCE", counts.TUNNEL_ENTRANCE ? 14 : 44 + agg * 25 - counts.SEISMIC_SENSOR * 4, "subsurface-maneuver");
+  addBuild("SEISMIC_SENSOR", counts.SEISMIC_SENSOR ? 10 : 36 + state.stats.marinesDeployed * 3, "tunnel-watch");
 
   if (counts.MISSILE_LAUNCHER > 0) {
     addAttack("DUMMY", hq, state.elapsed - memory.lastProbeAt > 20 ? 50 + playerAa * 12 : 12, "aa-probe");
@@ -832,6 +982,9 @@ const scoreAiActions = (
   if (counts.EMP_CANNON > 0) {
     addAttack("EMP", playerPower, 52 + playerAa * 7, "power-disable");
     addAttack("EMP", playerRadar, 44 + counts.RADAR_JAMMER * 10, "blind-radar");
+  }
+  if (counts.MISSILE_LAUNCHER > 0 && counts.SEISMIC_SENSOR > 0) {
+    addAttack("TUNNEL_BUSTER", hq, 34 + state.mechs.filter((m) => m.side === "PLAYER" && (m.layer ?? "SURFACE") === "UNDERGROUND").length * 35, "collapse-tunnels");
   }
 
   return actions.sort((a, b) => b.score - a.score || a.reason.localeCompare(b.reason));
@@ -919,6 +1072,7 @@ export const stepGame = (state: RuntimeState, mission: MissionDef, dt: number) =
   fullRevealRadar(state);
   tickJammers(state, dt);
   tickProjectiles(state, dt);
+  tickSeismicSensors(state);
   tickMechs(state, dt);
   tickParticles(state, dt);
   tickShake(state, dt);

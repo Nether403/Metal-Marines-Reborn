@@ -67,6 +67,26 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
       ctx.fill();
     }
 
+    if (state.viewLayer === "UNDERGROUND") {
+      for (let y = 0; y < GRID_H; y++) {
+        for (let x = 0; x < GRID_W; x++) {
+          const tile = state.playerIsland[y * GRID_W + x];
+          if (!tile?.tunnel?.open) continue;
+          ctx.fillStyle = (tile.tunnel.collapsedUntil ?? 0) > state.elapsed ? "rgba(239,68,68,0.65)" : "rgba(251,191,36,0.42)";
+          ctx.fillRect(x * tw + tw * 0.25, y * th + th * 0.25, tw * 0.5, th * 0.5);
+        }
+      }
+      for (const m of state.mechs) {
+        if (m.side !== "PLAYER" || (m.layer ?? "SURFACE") !== "UNDERGROUND") continue;
+        const tx = Math.floor(m.pos.x / TILE_PX);
+        const ty = Math.floor(m.pos.y / TILE_PX);
+        ctx.fillStyle = "#fbbf24";
+        ctx.beginPath();
+        ctx.arc((tx + 0.5) * tw, (ty + 0.5) * th, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
     // Incoming hostile projectiles: pulsing red dot at projected impact tile.
     const t = performance.now() / 1000;
     const pulse = 0.5 + 0.5 * Math.sin(t * 6);
@@ -123,7 +143,7 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
               hasRadar ? "text-primary" : "text-muted-foreground/70"
             }
           >
-            {hasRadar ? (jammerActive ? "JAMMED" : "ONLINE") : "OFFLINE"}
+            {state.viewLayer === "UNDERGROUND" ? "SEISMIC" : hasRadar ? (jammerActive ? "JAMMED" : "ONLINE") : "OFFLINE"}
           </span>
         </div>
         <div className="p-2 flex flex-col gap-1.5">

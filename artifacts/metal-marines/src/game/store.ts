@@ -4,6 +4,7 @@ import type {
   MissionDef,
   ProjectileType,
   RuntimeState,
+  TileLayer,
   Tile,
 } from "./types";
 import {
@@ -55,6 +56,7 @@ interface Store {
 
   selectBuild: (t: BuildingType | null) => void;
   selectWeapon: (t: ProjectileType | null) => void;
+  setViewLayer: (layer: TileLayer) => void;
   tryBuild: (x: number, y: number) => boolean;
   tryFire: (wx: number, wy: number) => boolean;
   tryInterceptAt: (wx: number, wy: number) => boolean;
@@ -117,6 +119,16 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
   aiSeed("SUPPLY_DEPOT", mission.enemyStartHQ.x + 2, mission.enemyStartHQ.y);
   aiSeed("AA_GUN", mission.enemyStartHQ.x, mission.enemyStartHQ.y - 2);
 
+  const withTunnels = (tiles: Tile[]): Tile[] =>
+    tiles.map((t) => {
+      const interior = t.x > 0 && t.y > 0 && t.x < GRID_W - 1 && t.y < GRID_H - 1;
+      const hqSpine = t.x === mission.playerStartHQ.x || t.y === mission.playerStartHQ.y;
+      const open = interior && t.terrain !== "WATER" && (hqSpine || (t.x + t.y) % 3 !== 0);
+      return { ...t, tunnel: t.tunnel ?? { open } };
+    });
+  const playerIsland = withTunnels(mission.playerIsland as Tile[]);
+  const enemyIsland = withTunnels(mission.enemyIsland as Tile[]);
+
   return {
     status: "PLAYING",
     missionId: mission.id,
@@ -138,6 +150,7 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
     alerts: [],
     selectedBuild: null,
     selectedWeapon: null,
+    viewLayer: "SURFACE",
     aiState: {
       phase: "ECO",
       nextActionAt: mission.difficulty <= 1 ? 8 : mission.difficulty <= 2 ? 5 : 3,
@@ -155,8 +168,8 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
       buildingsDestroyed: 0,
     },
     shake: 0,
-    playerIsland: mission.playerIsland as Tile[],
-    enemyIsland: mission.enemyIsland as Tile[],
+    playerIsland,
+    enemyIsland,
   };
 };
 
@@ -232,6 +245,13 @@ export const useGame = create<Store>((set, get) => ({
     set({ runtime: { ...rt } });
   },
 
+  setViewLayer: (layer) => {
+    const rt = get().runtime;
+    if (!rt) return;
+    rt.viewLayer = layer;
+    set({ runtime: { ...rt } });
+  },
+
   tryBuild: (x, y) => {
     const { runtime } = get();
     if (!runtime || !runtime.selectedBuild) return false;
@@ -300,6 +320,17 @@ export const useGame = create<Store>((set, get) => ({
       const m = getMission(parsed.missionId);
       if (!m) return null;
       parsed.runtime.rngSeed ??= hashSeed(`${m.id}:${m.index}:${m.difficulty}`);
+      parsed.runtime.viewLayer ??= "SURFACE";
+      parsed.runtime.playerIsland ??= m.playerIsland;
+      parsed.runtime.enemyIsland ??= m.enemyIsland;
+      parsed.runtime.playerIsland = parsed.runtime.playerIsland.map((t: Tile) => ({
+        ...t,
+        tunnel: t.tunnel ?? { open: t.x > 0 && t.y > 0 && t.x < GRID_W - 1 && t.y < GRID_H - 1 && t.terrain !== "WATER" },
+      }));
+      parsed.runtime.enemyIsland = parsed.runtime.enemyIsland.map((t: Tile) => ({
+        ...t,
+        tunnel: t.tunnel ?? { open: t.x > 0 && t.y > 0 && t.x < GRID_W - 1 && t.y < GRID_H - 1 && t.terrain !== "WATER" },
+      }));
       parsed.runtime.aiState ??= { phase: "ECO", nextActionAt: 3, builtCount: 0 };
       parsed.runtime.aiState.memory ??= {
         seenPlayerBuildings: {},

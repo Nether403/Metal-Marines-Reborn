@@ -35,6 +35,8 @@ const HOTKEYS_BUILD: Record<string, string> = {
   "8": "LAND_MINE",
   "9": "RADAR_JAMMER",
   "0": "EMP_CANNON",
+  "-": "TUNNEL_ENTRANCE",
+  "=": "SEISMIC_SENSOR",
 };
 const HOTKEYS_WEAPON: Record<string, string> = {
   q: "ICBM",
@@ -42,6 +44,7 @@ const HOTKEYS_WEAPON: Record<string, string> = {
   e: "AA",
   r: "TRANSPORT_POD",
   t: "EMP",
+  y: "TUNNEL_BUSTER",
 };
 
 export default function Play() {
@@ -61,6 +64,7 @@ export default function Play() {
   const tryInterceptAt = useGame((s) => s.tryInterceptAt);
   const selectBuild = useGame((s) => s.selectBuild);
   const selectWeapon = useGame((s) => s.selectWeapon);
+  const setViewLayer = useGame((s) => s.setViewLayer);
   const clearSnapshot = useGame((s) => s.clearSnapshot);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -186,6 +190,11 @@ export default function Play() {
         return;
       }
       const k = e.key.toLowerCase();
+      if (k === "v") {
+        const rt = useGame.getState().runtime;
+        if (rt) setViewLayer(rt.viewLayer === "SURFACE" ? "UNDERGROUND" : "SURFACE");
+        return;
+      }
       if (HOTKEYS_BUILD[e.key]) {
         selectBuild(HOTKEYS_BUILD[e.key] as keyof typeof BUILDINGS);
       } else if (HOTKEYS_WEAPON[k]) {
@@ -194,7 +203,7 @@ export default function Play() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectBuild, selectWeapon, setPaused]);
+  }, [selectBuild, selectWeapon, setPaused, setViewLayer]);
 
   if (!missionId) {
     setLocation("/missions");
@@ -280,6 +289,14 @@ export default function Play() {
             }}
           >
             <X className="w-3.5 h-3.5 mr-1" /> ABORT
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="font-mono border-amber-400/40 text-amber-200 h-8"
+            onClick={() => setViewLayer(runtime.viewLayer === "SURFACE" ? "UNDERGROUND" : "SURFACE")}
+          >
+            {runtime.viewLayer === "SURFACE" ? "SURFACE" : "TUNNELS"}
           </Button>
         </div>
 
