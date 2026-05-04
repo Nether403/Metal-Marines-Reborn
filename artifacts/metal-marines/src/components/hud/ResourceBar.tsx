@@ -55,11 +55,17 @@ export default function ResourceBar({ state }: { state: RuntimeState }) {
           TUNNEL VIEW {undergroundContacts ? `· ${undergroundContacts} CONTACT` : ""}
         </div>
       )}
+      {state.weatherActive && (
+        <div className="text-lime-200 bg-lime-500/10 border border-lime-400/30 px-2 py-0.5 rounded uppercase text-xs">
+          {state.weatherActive.type.replace("_", " ")} {(state.weatherActive.duration - (state.elapsed - state.weatherActive.startedAt)).toFixed(0)}s
+        </div>
+      )}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span>FIRED <span className="text-foreground">{state.stats.missilesFired}</span></span>
         <span>DROPS <span className="text-foreground">{state.stats.marinesDeployed}</span></span>
         <span>KILLS <span className="text-primary">{state.stats.buildingsDestroyed}</span></span>
         <span>LOST <span className="text-destructive">{state.stats.buildingsLost}</span></span>
+        <span>ECO <span className="text-lime-300">{state.stats.environmentalActions}</span></span>
       </div>
     </div>
   );

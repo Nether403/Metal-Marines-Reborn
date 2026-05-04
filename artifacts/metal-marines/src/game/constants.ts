@@ -85,6 +85,39 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     description: "Detects underground movement and exposes tunnel incursions for counter-battery fire.",
     range: 150,
   },
+  TERRAIN_DESTABILIZER: {
+    type: "TERRAIN_DESTABILIZER",
+    name: "Destabilizer",
+    hotkey: "[",
+    costFunds: 420,
+    costEnergy: 130,
+    buildTime: 8,
+    maxHp: 190,
+    description: "Mutates enemy terrain into short-lived toxic sludge chokepoints.",
+    range: 520,
+  },
+  WEATHER_CONTROL: {
+    type: "WEATHER_CONTROL",
+    name: "Weather Control",
+    hotkey: "]",
+    costFunds: 460,
+    costEnergy: 160,
+    buildTime: 9,
+    maxHp: 210,
+    description: "Triggers deterministic dust storms, floods, or tremors across the battlespace.",
+    range: 520,
+  },
+  BIOSPHERE_ENGINE: {
+    type: "BIOSPHERE_ENGINE",
+    name: "Biosphere Engine",
+    hotkey: "\\",
+    costFunds: 340,
+    costEnergy: 120,
+    buildTime: 8,
+    maxHp: 220,
+    description: "Regenerates damaged biomes and boosts nearby economy infrastructure.",
+    range: 96,
+  },
   MISSILE_LAUNCHER: {
     type: "MISSILE_LAUNCHER",
     name: "Missile Silo",
@@ -167,6 +200,9 @@ export const BUILDING_COST_SCALING: Partial<
   EMP_CANNON: { freeCount: 1, rate: 0.26, exponent: 1.22, maxMultiplier: 2.8 },
   TUNNEL_ENTRANCE: { freeCount: 1, rate: 0.32, exponent: 1.24, maxMultiplier: 3 },
   SEISMIC_SENSOR: { freeCount: 1, rate: 0.18, exponent: 1.18, maxMultiplier: 2.2 },
+  TERRAIN_DESTABILIZER: { freeCount: 1, rate: 0.32, exponent: 1.25, maxMultiplier: 3 },
+  WEATHER_CONTROL: { freeCount: 1, rate: 0.34, exponent: 1.28, maxMultiplier: 3.2 },
+  BIOSPHERE_ENGINE: { freeCount: 1, rate: 0.24, exponent: 1.2, maxMultiplier: 2.6 },
 };
 
 export const WEAPON_COSTS: Record<ProjectileType, { funds: number; energy: number }> = {
@@ -202,3 +238,13 @@ export const SEISMIC_SENSOR_RANGE = 150;
 export const SEISMIC_DETECTION_SECONDS = 4;
 export const TUNNEL_COLLAPSE_RADIUS = 58;
 export const TUNNEL_COLLAPSE_SECONDS = 18;
+export const TOXIC_SLUDGE_SECONDS = 24;
+export const TERRAIN_DESTABILIZER_COOLDOWN = 20;
+export const WEATHER_CONTROL_COOLDOWN = 44;
+export const BIOSPHERE_ENGINE_COOLDOWN = 18;
+export const BIOSPHERE_ECONOMY_BONUS = 0.08;
+export const BIOSPHERE_REGEN_SECONDS = 38;
+export const WEATHER_DURATION_SECONDS = 24;
+export const DUST_STORM_DRIFT_TILES = 1;
+export const DUST_STORM_MECH_SPEED_MULTIPLIER = 0.9;
+export const TREMOR_DEFENSE_PENALTY = 0.15;

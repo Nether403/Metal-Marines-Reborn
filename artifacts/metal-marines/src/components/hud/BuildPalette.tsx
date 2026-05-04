@@ -11,6 +11,9 @@ const buildOrder: BuildingType[] = [
   "RADAR_JAMMER",
   "TUNNEL_ENTRANCE",
   "SEISMIC_SENSOR",
+  "TERRAIN_DESTABILIZER",
+  "WEATHER_CONTROL",
+  "BIOSPHERE_ENGINE",
   "MISSILE_LAUNCHER",
   "EMP_CANNON",
   "METAL_MARINE_BASE",
@@ -115,7 +118,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
         <span>
           Click LEFT island to BUILD. Click RIGHT island to FIRE. Right-click or ESC to cancel.
         </span>
-        <span>1-0,-,= build · QWERTY weapons · V layer · SPACE pause</span>
+        <span>1-0,-,=,[,],\ build · QWERTY weapons · V layer · SPACE pause</span>
       </div>
     </div>
   );

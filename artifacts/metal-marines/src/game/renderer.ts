@@ -25,6 +25,7 @@ const TERRAIN_FILL: Record<string, string> = {
   FOREST: "#0a2d20",
   MOUNTAIN: "#1f2937",
   WATER: "#0a1933",
+  TOXIC_SLUDGE: "#3f6212",
 };
 
 const TERRAIN_ACCENT: Record<string, string> = {
@@ -32,6 +33,7 @@ const TERRAIN_ACCENT: Record<string, string> = {
   FOREST: "#14532d",
   MOUNTAIN: "#374151",
   WATER: "#1e3a5f",
+  TOXIC_SLUDGE: "#a3e635",
 };
 
 const drawWaterShimmer = (ctx: CanvasRenderingContext2D, x: number, y: number, t: number) => {
@@ -96,6 +98,16 @@ const drawIsland = (
         ctx.fill();
       } else if (tile.terrain === "WATER") {
         drawWaterShimmer(ctx, px, py, t);
+      } else if (tile.terrain === "TOXIC_SLUDGE") {
+        ctx.fillStyle = `rgba(190,242,100,${0.14 + 0.08 * Math.sin(t * 5 + x + y)})`;
+        ctx.beginPath();
+        ctx.arc(px + TILE_PX * 0.5, py + TILE_PX * 0.5, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(217,249,157,0.35)";
+        ctx.beginPath();
+        ctx.moveTo(px + 8, py + 28);
+        ctx.bezierCurveTo(px + 16, py + 14, px + 28, py + 34, px + 36, py + 18);
+        ctx.stroke();
       }
 
       if (underground) {
@@ -167,6 +179,11 @@ const buildingFill: Record<string, string> = {
   SUPPLY_DEPOT: "#facc15",
   RADAR: "#8b5cf6",
   RADAR_JAMMER: "#a855f7",
+  TUNNEL_ENTRANCE: "#d97706",
+  SEISMIC_SENSOR: "#67e8f9",
+  TERRAIN_DESTABILIZER: "#84cc16",
+  WEATHER_CONTROL: "#38bdf8",
+  BIOSPHERE_ENGINE: "#22c55e",
   MISSILE_LAUNCHER: "#f97316",
   EMP_CANNON: "#22d3ee",
   METAL_MARINE_BASE: "#ef4444",
@@ -181,6 +198,11 @@ const buildingGlyph: Record<string, string> = {
   SUPPLY_DEPOT: "$",
   RADAR: "R",
   RADAR_JAMMER: "J",
+  TUNNEL_ENTRANCE: "G",
+  SEISMIC_SENSOR: "S",
+  TERRAIN_DESTABILIZER: "D",
+  WEATHER_CONTROL: "W",
+  BIOSPHERE_ENGINE: "BIO",
   MISSILE_LAUNCHER: "M",
   EMP_CANNON: "EMP",
   METAL_MARINE_BASE: "B",
@@ -268,6 +290,8 @@ const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
       ? "#fbbf24"
       : p.type === "EMP"
       ? "#22d3ee"
+      : p.type === "TUNNEL_BUSTER"
+      ? "#f59e0b"
       : p.type === "DUMMY"
       ? p.falseSignature ? "#a855f7" : "#94a3b8"
       : p.type === "AA"
@@ -344,6 +368,50 @@ const drawSeaBetween = (ctx: CanvasRenderingContext2D, t: number) => {
   ctx.fillText("- SECTOR 7 ATLANTIC OPS -", x + SKY_GAP_PX / 2, 16);
   ctx.fillText("// CONTESTED AIRSPACE //", x + SKY_GAP_PX / 2, ISLAND_PX_H - 8);
   ctx.textAlign = "start";
+};
+
+const drawWeatherOverlay = (ctx: CanvasRenderingContext2D, state: RuntimeState, t: number) => {
+  const weather = state.weatherActive;
+  if (!weather) return;
+  const age = state.elapsed - weather.startedAt;
+  const fade = Math.min(1, age / 2, (weather.duration - age) / 2);
+  if (fade <= 0) return;
+  ctx.save();
+  if (weather.type === "DUST_STORM") {
+    ctx.fillStyle = `rgba(180,83,9,${0.08 * fade})`;
+    ctx.fillRect(0, 0, WORLD_W, ISLAND_PX_H);
+    ctx.strokeStyle = `rgba(251,191,36,${0.18 * fade})`;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 18; i++) {
+      const y = ((i * 31 + t * 70) % ISLAND_PX_H);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WORLD_W, y - 42);
+      ctx.stroke();
+    }
+  } else if (weather.type === "FLOOD") {
+    ctx.fillStyle = `rgba(14,165,233,${0.07 * fade})`;
+    ctx.fillRect(0, 0, WORLD_W, ISLAND_PX_H);
+    ctx.strokeStyle = `rgba(125,211,252,${0.2 * fade})`;
+    for (let i = 0; i < 10; i++) {
+      const y = ((i * 43 + t * 24) % ISLAND_PX_H);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(WORLD_W, y + Math.sin(t + i) * 8);
+      ctx.stroke();
+    }
+  } else {
+    ctx.strokeStyle = `rgba(250,204,21,${0.18 * fade})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      const x = ((i * 137 + t * 15) % WORLD_W);
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + Math.sin(t * 6 + i) * 16, ISLAND_PX_H);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 };
 
 const drawPlacementGhost = (
@@ -423,6 +491,8 @@ export const renderFrame = (
   for (const p of state.projectiles) drawProjectile(ctx, p);
   // Particles on top
   for (const p of state.particles) drawParticle(ctx, p);
+
+  drawWeatherOverlay(ctx, state, time);
 
   drawPlacementGhost(ctx, state, hover);
 

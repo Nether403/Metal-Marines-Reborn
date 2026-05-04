@@ -1,5 +1,9 @@
 import {
   BUILDINGS,
+  BIOSPHERE_ECONOMY_BONUS,
+  BIOSPHERE_ENGINE_COOLDOWN,
+  BIOSPHERE_REGEN_SECONDS,
+  DUST_STORM_MECH_SPEED_MULTIPLIER,
   EMP_DISABLE_SECONDS,
   EMP_SPLASH,
   GRID_H,
@@ -16,11 +20,16 @@ import {
   SEISMIC_DETECTION_SECONDS,
   SEISMIC_SENSOR_RANGE,
   SKY_GAP_PX,
+  TERRAIN_DESTABILIZER_COOLDOWN,
+  TOXIC_SLUDGE_SECONDS,
   TILE_PX,
+  TREMOR_DEFENSE_PENALTY,
   TUNNEL_COLLAPSE_RADIUS,
   TUNNEL_COLLAPSE_SECONDS,
   TUNNEL_MOVE_MULTIPLIER,
   TUNNEL_TRANSITION_SECONDS,
+  WEATHER_CONTROL_COOLDOWN,
+  WEATHER_DURATION_SECONDS,
   WEAPON_COSTS,
 } from "./constants";
 import { getBuildingCost } from "./economy";
@@ -37,8 +46,10 @@ import type {
   Projectile,
   ProjectileType,
   RuntimeState,
+  TerrainMutation,
   Tile,
   TileLayer,
+  WeatherType,
 } from "./types";
 import { sfx } from "@/lib/sfx";
 
@@ -102,6 +113,7 @@ export const isBuildable = (
   if (!t) return false;
   if (t.terrain === "WATER") return false;
   if (t.terrain === "MOUNTAIN") return false;
+  if (t.terrain === "TOXIC_SLUDGE") return false;
   if (t.terrain === "FOREST" && type !== "LAND_MINE") return false;
   // Footprint check (1x1 for simplicity)
   const occ = buildings.some(
@@ -174,6 +186,32 @@ const clearMechPath = (m: Mech) => {
 
 const islandTiles = (state: RuntimeState, side: Owner): Tile[] =>
   side === "PLAYER" ? state.playerIsland : state.enemyIsland;
+
+const opposingSide = (side: Owner): Owner => (side === "PLAYER" ? "ENEMY" : "PLAYER");
+
+const clearPathsOnSide = (state: RuntimeState, side: Owner) => {
+  for (const m of state.mechs) {
+    if (m.side === side) clearMechPath(m);
+  }
+};
+
+const activeBuildingByType = (state: RuntimeState, side: Owner, type: BuildingType): Building[] =>
+  state.buildings.filter((b) => b.side === side && b.type === type && isBuildingActive(b, state.elapsed));
+
+const hasBiosphereSupport = (state: RuntimeState, b: Building): boolean =>
+  activeBuildingByType(state, b.side, "BIOSPHERE_ENGINE").some((bio) => {
+    const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
+    const ew = tileToWorld(bio.side, bio.pos.x, bio.pos.y);
+    return distance(bw.x, bw.y, ew.x, ew.y) <= (BUILDINGS.BIOSPHERE_ENGINE.range ?? 96);
+  });
+
+const weatherSpeedMultiplier = (state: RuntimeState, m: Mech): number => {
+  const weather = state.weatherActive;
+  if (!weather) return 1;
+  if (weather.type === "DUST_STORM" && (m.layer ?? "SURFACE") === "SURFACE") return DUST_STORM_MECH_SPEED_MULTIPLIER;
+  if (weather.type === "FLOOD" && (m.layer ?? "SURFACE") === "SURFACE") return 0.78;
+  return 1;
+};
 
 const isTunnelOpen = (tiles: Tile[], pos: Position, now: number): boolean => {
   const tile = getTile(tiles, pos.x, pos.y);
@@ -457,8 +495,9 @@ const computeRates = (state: RuntimeState) => {
   for (const b of state.buildings) {
     if (b.side !== "PLAYER" || !isBuildingActive(b, state.elapsed)) continue;
     const spec = BUILDINGS[b.type];
-    f += spec.fundsPerSec ?? 0;
-    e += spec.energyPerSec ?? 0;
+    const bonus = hasBiosphereSupport(state, b) ? 1 + BIOSPHERE_ECONOMY_BONUS : 1;
+    f += (spec.fundsPerSec ?? 0) * bonus;
+    e += (spec.energyPerSec ?? 0) * bonus;
   }
   state.playerFundsRate = f;
   state.playerEnergyRate = e;
@@ -488,8 +527,9 @@ const tickResources = (state: RuntimeState, dt: number) => {
   for (const b of state.buildings) {
     if (b.side !== "ENEMY" || !isBuildingActive(b, state.elapsed)) continue;
     const spec = BUILDINGS[b.type];
-    ef += spec.fundsPerSec ?? 0;
-    ee += spec.energyPerSec ?? 0;
+    const bonus = hasBiosphereSupport(state, b) ? 1 + BIOSPHERE_ECONOMY_BONUS : 1;
+    ef += (spec.fundsPerSec ?? 0) * bonus;
+    ee += (spec.energyPerSec ?? 0) * bonus;
   }
   state.enemyFunds += ef * dt;
   state.enemyEnergy += ee * dt;
@@ -539,6 +579,111 @@ const applyEmpAt = (state: RuntimeState, side: Owner, wx: number, wy: number) =>
   spawnExplosion(state, side, wx, wy, false);
   state.shake = Math.min(1, state.shake + 0.25);
   sfx("intercept");
+};
+
+const mutateTerrain = (
+  state: RuntimeState,
+  side: Owner,
+  pos: Position,
+  sourceBuilding: string,
+  duration = TOXIC_SLUDGE_SECONDS
+): boolean => {
+  const tiles = islandTiles(state, side);
+  const tile = getTile(tiles, pos.x, pos.y);
+  if (!tile || tile.terrain === "WATER" || tile.terrain === "MOUNTAIN" || tile.terrain === "TOXIC_SLUDGE") return false;
+  if (state.buildings.some((b) => b.side === side && b.hp > 0 && b.pos.x === pos.x && b.pos.y === pos.y)) return false;
+  const mutation: TerrainMutation = {
+    id: uid("eco"),
+    side,
+    position: { ...pos },
+    original: tile.terrain,
+    mutated: "TOXIC_SLUDGE",
+    expiresAt: state.elapsed + duration,
+    sourceBuilding,
+  };
+  tile.terrain = mutation.mutated;
+  state.terrainMutations.push(mutation);
+  clearPathsOnSide(state, side);
+  return true;
+};
+
+const startWeather = (state: RuntimeState, sourceSide: Owner, type: WeatherType) => {
+  state.weatherActive = {
+    type,
+    startedAt: state.elapsed,
+    duration: WEATHER_DURATION_SECONDS,
+    intensity: type === "TREMOR" ? 0.85 : type === "FLOOD" ? 0.75 : 0.65,
+    sourceSide,
+  };
+  state.stats.environmentalActions++;
+  state.alerts.push({
+    id: uid("a"),
+    text: `${type.replace("_", " ")} FRONT ACTIVE`,
+    level: sourceSide === "PLAYER" ? "info" : "warn",
+    ts: 4,
+    category: "ecology",
+    side: opposingSide(sourceSide),
+    suggestion: type === "TREMOR" ? "Defenses are less reliable during seismic instability." : "Movement and visibility are degraded.",
+  });
+};
+
+const tickEcology = (state: RuntimeState) => {
+  for (let i = state.terrainMutations.length - 1; i >= 0; i--) {
+    const mutation = state.terrainMutations[i];
+    if (mutation.expiresAt > state.elapsed) continue;
+    const tile = getTile(islandTiles(state, mutation.side), mutation.position.x, mutation.position.y);
+    if (tile && tile.terrain === mutation.mutated) tile.terrain = mutation.original;
+    state.terrainMutations.splice(i, 1);
+    clearPathsOnSide(state, mutation.side);
+  }
+
+  if (state.weatherActive && state.elapsed - state.weatherActive.startedAt >= state.weatherActive.duration) {
+    state.weatherActive = undefined;
+  }
+
+  for (const b of state.buildings) {
+    if (!isBuildingActive(b, state.elapsed) || b.cooldown > 0) continue;
+    if (b.type === "TERRAIN_DESTABILIZER") {
+      const targetSide = opposingSide(b.side);
+      for (let tries = 0; tries < 18; tries++) {
+        const pos = { x: rngInt(state, 1, GRID_W - 1), y: rngInt(state, 1, GRID_H - 1) };
+        if (mutateTerrain(state, targetSide, pos, b.id)) {
+          b.cooldown = TERRAIN_DESTABILIZER_COOLDOWN;
+          state.stats.environmentalActions++;
+          state.alerts.push({
+            id: uid("a"),
+            text: "TERRAIN DESTABILIZED",
+            level: targetSide === "PLAYER" ? "warn" : "info",
+            ts: 3.2,
+            category: "ecology",
+            side: targetSide,
+            worldPos: tileToWorld(targetSide, pos.x, pos.y),
+            suggestion: "Toxic sludge blocks surface movement and construction until it decays.",
+          });
+          break;
+        }
+      }
+    } else if (b.type === "WEATHER_CONTROL" && !state.weatherActive) {
+      const roll = rngInt(state, 0, 3);
+      startWeather(state, b.side, roll === 0 ? "DUST_STORM" : roll === 1 ? "FLOOD" : "TREMOR");
+      b.cooldown = WEATHER_CONTROL_COOLDOWN;
+    } else if (b.type === "BIOSPHERE_ENGINE") {
+      const nearby = state.buildings.find((other) => {
+        if (other.side !== b.side || other.hp <= 0 || other.hp >= other.maxHp || other.type === "LAND_MINE") return false;
+        const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
+        const ow = tileToWorld(other.side, other.pos.x, other.pos.y);
+        return distance(bw.x, bw.y, ow.x, ow.y) <= (BUILDINGS.BIOSPHERE_ENGINE.range ?? 96);
+      });
+      if (nearby) {
+        nearby.hp = Math.min(nearby.maxHp, nearby.hp + nearby.maxHp * 0.08);
+        b.cooldown = BIOSPHERE_ENGINE_COOLDOWN;
+      }
+      const sludge = state.terrainMutations.find((m) => m.side === b.side && m.expiresAt > state.elapsed);
+      if (sludge && state.elapsed + BIOSPHERE_REGEN_SECONDS < sludge.expiresAt) {
+        sludge.expiresAt = state.elapsed + BIOSPHERE_REGEN_SECONDS;
+      }
+    }
+  }
 };
 
 const tickJammers = (state: RuntimeState, dt: number) => {
@@ -733,7 +878,8 @@ const tickMechs = (state: RuntimeState, dt: number) => {
       const r = BUILDINGS.GUN_TURRET.range ?? 110;
       if (distance(bw.x, bw.y, m.pos.x, m.pos.y) <= r) {
         b.cooldown = 1 / (BUILDINGS.GUN_TURRET.fireRate ?? 0.6);
-        m.hp -= BUILDINGS.GUN_TURRET.damage ?? 14;
+        const weatherPenalty = state.weatherActive?.type === "TREMOR" ? 1 - TREMOR_DEFENSE_PENALTY : 1;
+        m.hp -= (BUILDINGS.GUN_TURRET.damage ?? 14) * weatherPenalty;
         // Tracer particle
         state.particles.push({
           id: uid("pa"),
@@ -781,7 +927,7 @@ const tickMechs = (state: RuntimeState, dt: number) => {
         const wdx = ww.x - m.pos.x;
         const wdy = ww.y - m.pos.y;
         const wd = Math.hypot(wdx, wdy);
-        const step = MECH_SPEED * (layer === "UNDERGROUND" ? TUNNEL_MOVE_MULTIPLIER : 1) * dt;
+        const step = MECH_SPEED * (layer === "UNDERGROUND" ? TUNNEL_MOVE_MULTIPLIER : 1) * weatherSpeedMultiplier(state, m) * dt;
         if (wd <= step || wd < 1) {
           m.pos.x = ww.x;
           m.pos.y = ww.y;
@@ -894,6 +1040,9 @@ const countBuildingsByType = (buildings: Building[], side: Owner): Record<Buildi
     RADAR_JAMMER: 0,
     TUNNEL_ENTRANCE: 0,
     SEISMIC_SENSOR: 0,
+    TERRAIN_DESTABILIZER: 0,
+    WEATHER_CONTROL: 0,
+    BIOSPHERE_ENGINE: 0,
     MISSILE_LAUNCHER: 0,
     EMP_CANNON: 0,
     METAL_MARINE_BASE: 0,
@@ -967,6 +1116,9 @@ const scoreAiActions = (
   addBuild("EMP_CANNON", counts.EMP_CANNON ? 10 : 48 + playerAa * 6 + (playerPower ? 12 : 0), "disable-grid");
   addBuild("TUNNEL_ENTRANCE", counts.TUNNEL_ENTRANCE ? 14 : 44 + agg * 25 - counts.SEISMIC_SENSOR * 4, "subsurface-maneuver");
   addBuild("SEISMIC_SENSOR", counts.SEISMIC_SENSOR ? 10 : 36 + state.stats.marinesDeployed * 3, "tunnel-watch");
+  addBuild("TERRAIN_DESTABILIZER", counts.TERRAIN_DESTABILIZER ? 12 : 36 + agg * 18 + Object.keys(memory.seenPlayerBuildings).length * 2, "terrain-denial");
+  addBuild("WEATHER_CONTROL", counts.WEATHER_CONTROL ? 9 : 34 + agg * 16 + playerAa * 4, "weather-control");
+  addBuild("BIOSPHERE_ENGINE", counts.BIOSPHERE_ENGINE ? 10 : 28 + eco * 18, "eco-resilience");
 
   if (counts.MISSILE_LAUNCHER > 0) {
     addAttack("DUMMY", hq, state.elapsed - memory.lastProbeAt > 20 ? 50 + playerAa * 12 : 12, "aa-probe");
@@ -1069,6 +1221,7 @@ export const stepGame = (state: RuntimeState, mission: MissionDef, dt: number) =
   state.elapsed += dt;
   tickResources(state, dt);
   tickBuildings(state, dt);
+  tickEcology(state);
   fullRevealRadar(state);
   tickJammers(state, dt);
   tickProjectiles(state, dt);

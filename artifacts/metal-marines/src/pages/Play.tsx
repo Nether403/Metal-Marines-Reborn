@@ -37,6 +37,9 @@ const HOTKEYS_BUILD: Record<string, string> = {
   "0": "EMP_CANNON",
   "-": "TUNNEL_ENTRANCE",
   "=": "SEISMIC_SENSOR",
+  "[": "TERRAIN_DESTABILIZER",
+  "]": "WEATHER_CONTROL",
+  "\\": "BIOSPHERE_ENGINE",
 };
 const HOTKEYS_WEAPON: Record<string, string> = {
   q: "ICBM",

@@ -119,15 +119,15 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
   aiSeed("SUPPLY_DEPOT", mission.enemyStartHQ.x + 2, mission.enemyStartHQ.y);
   aiSeed("AA_GUN", mission.enemyStartHQ.x, mission.enemyStartHQ.y - 2);
 
-  const withTunnels = (tiles: Tile[]): Tile[] =>
+  const withTunnels = (tiles: Tile[], hq: { x: number; y: number }): Tile[] =>
     tiles.map((t) => {
       const interior = t.x > 0 && t.y > 0 && t.x < GRID_W - 1 && t.y < GRID_H - 1;
-      const hqSpine = t.x === mission.playerStartHQ.x || t.y === mission.playerStartHQ.y;
+      const hqSpine = t.x === hq.x || t.y === hq.y;
       const open = interior && t.terrain !== "WATER" && (hqSpine || (t.x + t.y) % 3 !== 0);
       return { ...t, tunnel: t.tunnel ?? { open } };
     });
-  const playerIsland = withTunnels(mission.playerIsland as Tile[]);
-  const enemyIsland = withTunnels(mission.enemyIsland as Tile[]);
+  const playerIsland = withTunnels(mission.playerIsland as Tile[], mission.playerStartHQ);
+  const enemyIsland = withTunnels(mission.enemyIsland as Tile[], mission.enemyStartHQ);
 
   return {
     status: "PLAYING",
@@ -151,6 +151,7 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
     selectedBuild: null,
     selectedWeapon: null,
     viewLayer: "SURFACE",
+    terrainMutations: [],
     aiState: {
       phase: "ECO",
       nextActionAt: mission.difficulty <= 1 ? 8 : mission.difficulty <= 2 ? 5 : 3,
@@ -166,6 +167,7 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
       marinesDeployed: 0,
       buildingsLost: 0,
       buildingsDestroyed: 0,
+      environmentalActions: 0,
     },
     shake: 0,
     playerIsland,
@@ -321,6 +323,9 @@ export const useGame = create<Store>((set, get) => ({
       if (!m) return null;
       parsed.runtime.rngSeed ??= hashSeed(`${m.id}:${m.index}:${m.difficulty}`);
       parsed.runtime.viewLayer ??= "SURFACE";
+      parsed.runtime.terrainMutations ??= [];
+      parsed.runtime.stats ??= {};
+      parsed.runtime.stats.environmentalActions ??= 0;
       parsed.runtime.playerIsland ??= m.playerIsland;
       parsed.runtime.enemyIsland ??= m.enemyIsland;
       parsed.runtime.playerIsland = parsed.runtime.playerIsland.map((t: Tile) => ({

@@ -1,6 +1,7 @@
-export type TerrainType = "GRASS" | "FOREST" | "MOUNTAIN" | "WATER";
+export type TerrainType = "GRASS" | "FOREST" | "MOUNTAIN" | "WATER" | "TOXIC_SLUDGE";
 export type Owner = "PLAYER" | "ENEMY";
 export type TileLayer = "SURFACE" | "UNDERGROUND";
+export type WeatherType = "DUST_STORM" | "FLOOD" | "TREMOR";
 export type BuildingType =
   | "HQ"
   | "ENERGY_PLANT"
@@ -9,6 +10,9 @@ export type BuildingType =
   | "RADAR_JAMMER"
   | "TUNNEL_ENTRANCE"
   | "SEISMIC_SENSOR"
+  | "TERRAIN_DESTABILIZER"
+  | "WEATHER_CONTROL"
+  | "BIOSPHERE_ENGINE"
   | "MISSILE_LAUNCHER"
   | "EMP_CANNON"
   | "METAL_MARINE_BASE"
@@ -92,12 +96,22 @@ export interface Particle {
   size: number;
 }
 
+export interface TerrainMutation {
+  id: string;
+  side: Owner;
+  position: Position;
+  original: TerrainType;
+  mutated: TerrainType;
+  expiresAt: number;
+  sourceBuilding: string;
+}
+
 export interface AlertItem {
   id: string;
   text: string;
   level: "info" | "warn" | "crit";
   ts: number;
-  category?: "incoming" | "economy" | "ewarfare" | "combat" | "subterranean";
+  category?: "incoming" | "economy" | "ewarfare" | "combat" | "subterranean" | "ecology";
   worldPos?: Position;
   side?: Owner;
   severity?: number;
@@ -183,6 +197,15 @@ export interface RuntimeState {
   selectedBuild: BuildingType | null;
   selectedWeapon: ProjectileType | null;
   viewLayer: TileLayer;
+  weatherActive?: {
+    type: WeatherType;
+    startedAt: number;
+    duration: number;
+    intensity: number;
+    affectedTiles?: Array<Position & { side: Owner }>;
+    sourceSide: Owner;
+  };
+  terrainMutations: TerrainMutation[];
   aiState: {
     phase: "ECO" | "ARMY" | "ASSAULT";
     nextActionAt: number;
@@ -200,6 +223,7 @@ export interface RuntimeState {
     marinesDeployed: number;
     buildingsLost: number;
     buildingsDestroyed: number;
+    environmentalActions: number;
   };
   shake: number;
 }

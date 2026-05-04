@@ -49,11 +49,19 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
           ctx.fillStyle = "#1f2937";
         } else if (t.terrain === "FOREST") {
           ctx.fillStyle = "#0a2d20";
+        } else if (t.terrain === "TOXIC_SLUDGE") {
+          ctx.fillStyle = "#4d7c0f";
         } else {
           ctx.fillStyle = "#0e3b2c";
         }
         ctx.fillRect(x * tw, y * th, tw, th);
       }
+    }
+
+    for (const mutation of state.terrainMutations) {
+      if (mutation.side !== "PLAYER") continue;
+      ctx.fillStyle = "rgba(190,242,100,0.75)";
+      ctx.fillRect(mutation.position.x * tw + tw * 0.2, mutation.position.y * th + th * 0.2, tw * 0.6, th * 0.6);
     }
 
     // Player buildings as green dots
@@ -143,7 +151,7 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
               hasRadar ? "text-primary" : "text-muted-foreground/70"
             }
           >
-            {state.viewLayer === "UNDERGROUND" ? "SEISMIC" : hasRadar ? (jammerActive ? "JAMMED" : "ONLINE") : "OFFLINE"}
+            {state.weatherActive ? "ECO" : state.viewLayer === "UNDERGROUND" ? "SEISMIC" : hasRadar ? (jammerActive ? "JAMMED" : "ONLINE") : "OFFLINE"}
           </span>
         </div>
         <div className="p-2 flex flex-col gap-1.5">

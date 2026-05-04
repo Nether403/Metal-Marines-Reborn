@@ -6,6 +6,7 @@ const SURFACE_TERRAIN_COST: Record<Tile["terrain"], number> = {
   FOREST: 1.5,
   MOUNTAIN: Infinity,
   WATER: Infinity,
+  TOXIC_SLUDGE: Infinity,
 };
 
 const UNDERGROUND_TERRAIN_COST: Record<Tile["terrain"], number> = {
@@ -13,6 +14,7 @@ const UNDERGROUND_TERRAIN_COST: Record<Tile["terrain"], number> = {
   FOREST: 1.1,
   MOUNTAIN: 2.4,
   WATER: Infinity,
+  TOXIC_SLUDGE: Infinity,
 };
 
 const NEIGHBORS: Position[] = [
