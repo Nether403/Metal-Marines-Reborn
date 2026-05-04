@@ -75,6 +75,41 @@ export default function MissionSelect() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card className="bg-card/60 transition-colors group relative overflow-hidden border-secondary/40 hover:border-secondary/80">
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary/10 to-transparent opacity-80" />
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl font-bold text-foreground">
+                    Generated Skirmish
+                  </CardTitle>
+                  <CardDescription className="font-mono text-secondary uppercase text-xs">
+                    Procedural island war
+                  </CardDescription>
+                </div>
+                <span className="font-mono text-2xl font-black text-muted-foreground/30">∞</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Deterministic island generator with validation for coastline, buildable area, chokepoints, and navigable mech routes.
+              </p>
+              <div className="pt-3 border-t border-border/50">
+                <p className="text-xs font-mono text-secondary mb-3 uppercase tracking-wider">
+                  OBJECTIVE: Destroy the generated enemy HQ
+                </p>
+                <Button
+                  className="w-full font-mono bg-secondary/20 hover:bg-secondary hover:text-secondary-foreground text-secondary border border-secondary/50 transition-all"
+                  onClick={() => {
+                    const seed = `s${Date.now().toString(36).slice(-6)}`;
+                    setLocation(`/play/skirmish-${seed}`);
+                  }}
+                >
+                  GENERATE SECTOR
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
           {MISSIONS.map((mission) => {
             const cmd = COMMANDERS[mission.commanderId];
             const unlocked = isMissionUnlocked(mission.index, progress.cleared);

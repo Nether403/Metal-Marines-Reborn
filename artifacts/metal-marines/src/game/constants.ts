@@ -53,6 +53,17 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     maxHp: 160,
     description: "Reveals enemy island and tracks incoming threats.",
   },
+  RADAR_JAMMER: {
+    type: "RADAR_JAMMER",
+    name: "Radar Jammer",
+    hotkey: "9",
+    costFunds: 220,
+    costEnergy: 80,
+    buildTime: 6,
+    maxHp: 180,
+    description: "Electronic warfare array. Creates uncertain radar signatures and degrades enemy intercept confidence.",
+    range: 260,
+  },
   MISSILE_LAUNCHER: {
     type: "MISSILE_LAUNCHER",
     name: "Missile Silo",
@@ -62,6 +73,17 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 7,
     maxHp: 300,
     description: "Required to launch ICBMs, Dummies and AA missiles.",
+  },
+  EMP_CANNON: {
+    type: "EMP_CANNON",
+    name: "EMP Cannon",
+    hotkey: "0",
+    costFunds: 300,
+    costEnergy: 120,
+    buildTime: 8,
+    maxHp: 240,
+    description: "Launches EMP strikes that temporarily disable enemy power, radar, and defense buildings.",
+    range: 520,
   },
   METAL_MARINE_BASE: {
     type: "METAL_MARINE_BASE",
@@ -111,11 +133,25 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
   },
 };
 
+export const BUILDING_COST_SCALING: Partial<
+  Record<BuildingType, { freeCount: number; rate: number; exponent: number; maxMultiplier: number }>
+> = {
+  ENERGY_PLANT: { freeCount: 1, rate: 0.3, exponent: 1.35, maxMultiplier: 3.5 },
+  SUPPLY_DEPOT: { freeCount: 1, rate: 0.26, exponent: 1.3, maxMultiplier: 3.25 },
+  AA_GUN: { freeCount: 1, rate: 0.2, exponent: 1.22, maxMultiplier: 2.6 },
+  GUN_TURRET: { freeCount: 1, rate: 0.18, exponent: 1.18, maxMultiplier: 2.4 },
+  MISSILE_LAUNCHER: { freeCount: 1, rate: 0.24, exponent: 1.2, maxMultiplier: 2.8 },
+  METAL_MARINE_BASE: { freeCount: 1, rate: 0.28, exponent: 1.24, maxMultiplier: 3 },
+  RADAR_JAMMER: { freeCount: 1, rate: 0.24, exponent: 1.2, maxMultiplier: 2.6 },
+  EMP_CANNON: { freeCount: 1, rate: 0.26, exponent: 1.22, maxMultiplier: 2.8 },
+};
+
 export const WEAPON_COSTS: Record<ProjectileType, { funds: number; energy: number }> = {
   ICBM: { funds: 80, energy: 40 },
   DUMMY: { funds: 20, energy: 10 },
   AA: { funds: 30, energy: 20 },
   TRANSPORT_POD: { funds: 220, energy: 80 },
+  EMP: { funds: 120, energy: 120 },
 };
 
 export const WEAPON_LABELS: Record<ProjectileType, { name: string; hotkey: string; desc: string }> = {
@@ -123,6 +159,7 @@ export const WEAPON_LABELS: Record<ProjectileType, { name: string; hotkey: strin
   DUMMY: { name: "Dummy", hotkey: "W", desc: "Decoy. Bait enemy AA, scout fog." },
   AA: { name: "AA Missile", hotkey: "E", desc: "Manual intercept of an enemy missile." },
   TRANSPORT_POD: { name: "Marine Drop", hotkey: "R", desc: "Launch a Metal Marine pod." },
+  EMP: { name: "EMP", hotkey: "T", desc: "Disable buildings near the strike zone for a short window." },
 };
 
 export const ICBM_DAMAGE = 280;
@@ -131,3 +168,6 @@ export const MECH_HP = 220;
 export const MECH_DAMAGE = 28;
 export const MECH_SPEED = 28;
 export const MECH_ATTACK_COOLDOWN = 0.7;
+export const EMP_SPLASH = 72;
+export const EMP_DISABLE_SECONDS = 10;
+export const JAMMER_FALSE_SIGNATURE_INTERVAL = 7;

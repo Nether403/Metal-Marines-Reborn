@@ -1,5 +1,7 @@
 import {
   BUILDINGS,
+  EMP_DISABLE_SECONDS,
+  EMP_SPLASH,
   GRID_H,
   GRID_W,
   ICBM_DAMAGE,
@@ -10,10 +12,14 @@ import {
   MECH_DAMAGE,
   MECH_HP,
   MECH_SPEED,
+  JAMMER_FALSE_SIGNATURE_INTERVAL,
   SKY_GAP_PX,
   TILE_PX,
   WEAPON_COSTS,
 } from "./constants";
+import { getBuildingCost } from "./economy";
+import { findPathToAdjacentBuilding, isPathableTile } from "./pathfinding";
+import { randomFloatFromSeed, randomIntFromSeed, randomRangeFromSeed } from "./rng";
 import type {
   Building,
   BuildingType,
@@ -30,7 +36,25 @@ import type {
 import { sfx } from "@/lib/sfx";
 
 let _id = 0;
-export const uid = (p = "x") => `${p}_${++_id}_${Math.floor(Math.random() * 1e6)}`;
+export const uid = (p = "x") => `${p}_${++_id}`;
+
+const rng = (state: RuntimeState): number => {
+  const value = randomFloatFromSeed(state.rngSeed);
+  state.rngSeed = (state.rngSeed * 1664525 + 1013904223) >>> 0;
+  return value;
+};
+
+const rngRange = (state: RuntimeState, min: number, max: number): number => {
+  const value = randomRangeFromSeed(state.rngSeed, min, max);
+  state.rngSeed = (state.rngSeed * 1664525 + 1013904223) >>> 0;
+  return value;
+};
+
+const rngInt = (state: RuntimeState, min: number, maxExclusive: number): number => {
+  const value = randomIntFromSeed(state.rngSeed, min, maxExclusive);
+  state.rngSeed = (state.rngSeed * 1664525 + 1013904223) >>> 0;
+  return value;
+};
 
 export const tileIndex = (x: number, y: number) => y * GRID_W + x;
 
@@ -94,14 +118,15 @@ export const buildBuilding = (
   y: number
 ): boolean => {
   const spec = BUILDINGS[type];
+  const cost = getBuildingCost(state.buildings, side, type);
   const fundsRef = side === "PLAYER" ? "playerFunds" : "enemyFunds";
   const energyRef = side === "PLAYER" ? "playerEnergy" : "enemyEnergy";
-  if (state[fundsRef] < spec.costFunds) return false;
-  if (state[energyRef] < spec.costEnergy) return false;
+  if (state[fundsRef] < cost.funds) return false;
+  if (state[energyRef] < cost.energy) return false;
   const tiles = side === "PLAYER" ? state.playerIsland : state.enemyIsland;
   if (!isBuildable(tiles, state.buildings, side, type, x, y)) return false;
-  state[fundsRef] -= spec.costFunds;
-  state[energyRef] -= spec.costEnergy;
+  state[fundsRef] -= cost.funds;
+  state[energyRef] -= cost.energy;
   state.buildings.push({
     id: uid("b"),
     type,
@@ -128,6 +153,17 @@ declare module "./types" {
 const distance = (ax: number, ay: number, bx: number, by: number) =>
   Math.hypot(ax - bx, ay - by);
 
+const MECH_ATTACK_RANGE = TILE_PX + 4;
+
+const isBuildingActive = (b: Building, now: number): boolean =>
+  b.hp > 0 && b.buildTimeRemaining <= 0 && (b.disabledUntil ?? 0) <= now;
+
+const clearMechPath = (m: Mech) => {
+  m.path = undefined;
+  m.pathTargetId = undefined;
+  m.waypointIndex = 0;
+};
+
 export const launchMissile = (
   state: RuntimeState,
   side: Owner,
@@ -144,13 +180,14 @@ export const launchMissile = (
   // Need a launcher / mech bay alive on this side
   const requiresLauncher = type === "ICBM" || type === "DUMMY" || type === "AA";
   const requiresMechBay = type === "TRANSPORT_POD";
+  const requiresEmp = type === "EMP";
   const has = state.buildings.some(
     (b) =>
       b.side === side &&
-      b.hp > 0 &&
-      b.buildTimeRemaining <= 0 &&
+      isBuildingActive(b, state.elapsed) &&
       ((requiresLauncher && b.type === "MISSILE_LAUNCHER") ||
-        (requiresMechBay && b.type === "METAL_MARINE_BASE"))
+        (requiresMechBay && b.type === "METAL_MARINE_BASE") ||
+        (requiresEmp && b.type === "EMP_CANNON"))
   );
   if (!has) return false;
 
@@ -161,15 +198,15 @@ export const launchMissile = (
   const launcher = state.buildings.find(
     (b) =>
       b.side === side &&
-      b.hp > 0 &&
-      b.buildTimeRemaining <= 0 &&
+      isBuildingActive(b, state.elapsed) &&
       ((requiresLauncher && b.type === "MISSILE_LAUNCHER") ||
-        (requiresMechBay && b.type === "METAL_MARINE_BASE"))
+        (requiresMechBay && b.type === "METAL_MARINE_BASE") ||
+        (requiresEmp && b.type === "EMP_CANNON"))
   )!;
   const start = tileToWorld(side, launcher.pos.x, launcher.pos.y);
   const target = side === "PLAYER" ? "ENEMY" : "PLAYER";
 
-  const speed = type === "TRANSPORT_POD" ? 90 : type === "AA" ? 280 : 130;
+  const speed = type === "TRANSPORT_POD" ? 90 : type === "AA" ? 280 : type === "EMP" ? 160 : 130;
   const proj: Projectile = {
     id: uid("p"),
     type,
@@ -198,8 +235,7 @@ export const launchAAIntercept = (state: RuntimeState, side: Owner, target: Proj
   const launcher = state.buildings.find(
     (b) =>
       b.side === side &&
-      b.hp > 0 &&
-      b.buildTimeRemaining <= 0 &&
+        isBuildingActive(b, state.elapsed) &&
       (b.type === "AA_GUN" || b.type === "MISSILE_LAUNCHER")
   );
   if (!launcher) return false;
@@ -286,8 +322,8 @@ export const spawnExplosion = (
     ? ["#fef3c7", "#fbbf24", "#f97316", "#dc2626", "#991b1b"]
     : ["#fde68a", "#fbbf24", "#f97316"];
   for (let i = 0; i < n; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const sp = (big ? 100 : 60) * (0.4 + Math.random() * 0.8);
+    const a = rngRange(state, 0, Math.PI * 2);
+    const sp = (big ? 100 : 60) * rngRange(state, 0.4, 1.2);
     state.particles.push({
       id: uid("pa"),
       side,
@@ -295,9 +331,9 @@ export const spawnExplosion = (
       vx: Math.cos(a) * sp,
       vy: Math.sin(a) * sp,
       life: 0,
-      maxLife: 0.5 + Math.random() * 0.6,
-      color: palette[Math.floor(Math.random() * palette.length)],
-      size: big ? 2 + Math.random() * 4 : 1.5 + Math.random() * 2.5,
+      maxLife: rngRange(state, 0.5, 1.1),
+      color: palette[rngInt(state, 0, palette.length)],
+      size: big ? rngRange(state, 2, 6) : rngRange(state, 1.5, 4),
     });
   }
 };
@@ -320,7 +356,7 @@ export const revealAround = (
 
 export const fullRevealRadar = (state: RuntimeState) => {
   const hasRadar = state.buildings.some(
-    (b) => b.side === "PLAYER" && b.type === "RADAR" && b.hp > 0 && b.buildTimeRemaining <= 0
+    (b) => b.side === "PLAYER" && b.type === "RADAR" && isBuildingActive(b, state.elapsed)
   );
   if (!hasRadar) return;
   // Radar reveals a wide swath but not entirely — center band of enemy island
@@ -335,7 +371,7 @@ const computeRates = (state: RuntimeState) => {
   let f = 0;
   let e = 0;
   for (const b of state.buildings) {
-    if (b.side !== "PLAYER" || b.hp <= 0 || b.buildTimeRemaining > 0) continue;
+    if (b.side !== "PLAYER" || !isBuildingActive(b, state.elapsed)) continue;
     const spec = BUILDINGS[b.type];
     f += spec.fundsPerSec ?? 0;
     e += spec.energyPerSec ?? 0;
@@ -348,7 +384,7 @@ const computeEnemyRates = (state: RuntimeState) => {
   let f = 0;
   let e = 0;
   for (const b of state.buildings) {
-    if (b.side !== "ENEMY" || b.hp <= 0 || b.buildTimeRemaining > 0) continue;
+    if (b.side !== "ENEMY" || !isBuildingActive(b, state.elapsed)) continue;
     const spec = BUILDINGS[b.type];
     f += spec.fundsPerSec ?? 0;
     e += spec.energyPerSec ?? 0;
@@ -366,7 +402,7 @@ const tickResources = (state: RuntimeState, dt: number) => {
   let ef = 0;
   let ee = 0;
   for (const b of state.buildings) {
-    if (b.side !== "ENEMY" || b.hp <= 0 || b.buildTimeRemaining > 0) continue;
+    if (b.side !== "ENEMY" || !isBuildingActive(b, state.elapsed)) continue;
     const spec = BUILDINGS[b.type];
     ef += spec.fundsPerSec ?? 0;
     ee += spec.energyPerSec ?? 0;
@@ -392,6 +428,65 @@ const tickBuildings = (state: RuntimeState, dt: number) => {
   }
 };
 
+const applyEmpAt = (state: RuntimeState, side: Owner, wx: number, wy: number) => {
+  const ti = worldToTile(side, wx, wy);
+  revealAround(state, side, ti.x, ti.y, 2);
+  let disabled = 0;
+  for (const b of state.buildings) {
+    if (b.side !== side || b.hp <= 0 || b.type === "HQ" || b.type === "LAND_MINE") continue;
+    const bw = tileToWorld(side, b.pos.x, b.pos.y);
+    if (distance(bw.x, bw.y, wx, wy) <= EMP_SPLASH) {
+      b.disabledUntil = Math.max(b.disabledUntil ?? 0, state.elapsed + EMP_DISABLE_SECONDS);
+      b.cooldown = Math.max(b.cooldown, EMP_DISABLE_SECONDS * 0.35);
+      disabled++;
+    }
+  }
+  state.alerts.push({
+    id: uid("a"),
+    text: `${side === "PLAYER" ? "PLAYER" : "ENEMY"} GRID EMP: ${disabled} SYSTEMS DISABLED`,
+    level: side === "PLAYER" ? "crit" : "info",
+    ts: 3.5,
+    category: "ewarfare",
+    side,
+    worldPos: { x: wx, y: wy },
+    severity: disabled,
+    suggestion: side === "PLAYER" ? "Protect power and radar assets." : "Exploit the disable window.",
+  });
+  spawnExplosion(state, side, wx, wy, false);
+  state.shake = Math.min(1, state.shake + 0.25);
+  sfx("intercept");
+};
+
+const tickJammers = (state: RuntimeState, dt: number) => {
+  const ai = state.aiState;
+  ai.jammerTick = (ai.jammerTick ?? JAMMER_FALSE_SIGNATURE_INTERVAL) - dt;
+  if (ai.jammerTick > 0) return;
+  ai.jammerTick = JAMMER_FALSE_SIGNATURE_INTERVAL;
+
+  const enemyJammers = state.buildings.filter(
+    (b) => b.side === "ENEMY" && b.type === "RADAR_JAMMER" && isBuildingActive(b, state.elapsed)
+  );
+  if (!enemyJammers.length) return;
+
+  const x = rngInt(state, 1, GRID_W - 1);
+  const y = rngInt(state, 1, GRID_H - 1);
+  const target = tileToWorld("PLAYER", x, y);
+  const source = tileToWorld("ENEMY", enemyJammers[0].pos.x, enemyJammers[0].pos.y);
+  state.projectiles.push({
+    id: uid("p"),
+    type: "DUMMY",
+    owner: "ENEMY",
+    side: "PLAYER",
+    startWX: source.x,
+    startWY: source.y,
+    targetWX: target.x,
+    targetWY: target.y,
+    progress: 0.72,
+    speed: 95,
+    falseSignature: true,
+  });
+};
+
 const tickProjectiles = (state: RuntimeState, dt: number) => {
   for (let i = state.projectiles.length - 1; i >= 0; i--) {
     const p = state.projectiles[i];
@@ -412,7 +507,7 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
       // find nearest AA on the target side
       for (const b of state.buildings) {
         if (b.side !== p.side || b.type !== "AA_GUN") continue;
-        if (b.hp <= 0 || b.buildTimeRemaining > 0 || b.cooldown > 0) continue;
+        if (!isBuildingActive(b, state.elapsed) || b.cooldown > 0) continue;
         const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
         const r = BUILDINGS.AA_GUN.range ?? 220;
         if (distance(bw.x, bw.y, cur.x, cur.y) <= r) {
@@ -420,7 +515,7 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
           b.cooldown = 1 / (BUILDINGS.AA_GUN.fireRate ?? 1.2);
           // 70% intercept chance for ICBMs/PODS, 100% for dummies
           const prob = p.type === "DUMMY" ? 1 : 0.7;
-          if (Math.random() < prob) {
+          if (rng(state) < prob) {
             p.intercepted = true;
           }
           break;
@@ -454,6 +549,8 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
         }
       } else if (p.type === "ICBM") {
         explodeAt(state, p.side, p.targetWX, p.targetWY, ICBM_DAMAGE, ICBM_SPLASH, true);
+      } else if (p.type === "EMP") {
+        applyEmpAt(state, p.side, p.targetWX, p.targetWY);
       } else if (p.type === "DUMMY") {
         spawnExplosion(state, p.side, p.targetWX, p.targetWY, false);
         const ti = worldToTile(p.side, p.targetWX, p.targetWY);
@@ -519,7 +616,7 @@ const tickMechs = (state: RuntimeState, dt: number) => {
     // Gun turrets shoot at us
     for (const b of state.buildings) {
       if (b.side !== m.side || b.type !== "GUN_TURRET" || b.hp <= 0) continue;
-      if (b.buildTimeRemaining > 0 || b.cooldown > 0) continue;
+      if (!isBuildingActive(b, state.elapsed) || b.cooldown > 0) continue;
       const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
       const r = BUILDINGS.GUN_TURRET.range ?? 110;
       if (distance(bw.x, bw.y, m.pos.x, m.pos.y) <= r) {
@@ -545,12 +642,45 @@ const tickMechs = (state: RuntimeState, dt: number) => {
     const dx = tw.x - m.pos.x;
     const dy = tw.y - m.pos.y;
     const d = Math.hypot(dx, dy);
-    if (d > 22) {
+    if (d > MECH_ATTACK_RANGE) {
       m.state = "WALKING";
-      m.pos.x += (dx / d) * MECH_SPEED * dt;
-      m.pos.y += (dy / d) * MECH_SPEED * dt;
+      const currentTile = worldToTile(m.side, m.pos.x, m.pos.y);
+      const tiles = m.side === "PLAYER" ? state.playerIsland : state.enemyIsland;
+      const nextWaypoint = m.path?.[m.waypointIndex ?? 0];
+      const waypointBlocked = nextWaypoint
+        ? !isPathableTile(tiles, state.buildings, m.side, nextWaypoint.x, nextWaypoint.y, {
+            allowOccupiedStart: true,
+            start: currentTile,
+          })
+        : false;
+      const pathExhausted = !!m.path?.length && (m.waypointIndex ?? 0) >= m.path.length;
+      if (m.pathTargetId !== target.id || !m.path?.length || waypointBlocked || pathExhausted) {
+        m.path = findPathToAdjacentBuilding(tiles, state.buildings, m.side, currentTile, target);
+        m.pathTargetId = target.id;
+        m.waypointIndex = m.path.length > 1 ? 1 : 0;
+      }
+
+      const waypoint = m.path?.[m.waypointIndex ?? 0];
+      if (waypoint) {
+        const ww = tileToWorld(m.side, waypoint.x, waypoint.y);
+        const wdx = ww.x - m.pos.x;
+        const wdy = ww.y - m.pos.y;
+        const wd = Math.hypot(wdx, wdy);
+        const step = MECH_SPEED * dt;
+        if (wd <= step || wd < 1) {
+          m.pos.x = ww.x;
+          m.pos.y = ww.y;
+          m.waypointIndex = Math.min((m.waypointIndex ?? 0) + 1, m.path.length);
+        } else {
+          m.pos.x += (wdx / wd) * step;
+          m.pos.y += (wdy / wd) * step;
+        }
+      } else {
+        clearMechPath(m);
+      }
     } else {
       m.state = "ATTACKING";
+      clearMechPath(m);
       m.attackCooldown -= dt;
       if (m.attackCooldown <= 0) {
         m.attackCooldown = MECH_ATTACK_COOLDOWN;
@@ -605,6 +735,108 @@ const checkWinLoss = (state: RuntimeState) => {
 };
 
 // ----------------- Enemy AI -----------------
+type AiAction =
+  | { kind: "build"; building: BuildingType; score: number; reason: string }
+  | { kind: "attack"; projectile: ProjectileType; target: Building; score: number; reason: string };
+
+const countBuildingsByType = (buildings: Building[], side: Owner): Record<BuildingType, number> => {
+  const counts: Record<BuildingType, number> = {
+    HQ: 0,
+    ENERGY_PLANT: 0,
+    SUPPLY_DEPOT: 0,
+    RADAR: 0,
+    RADAR_JAMMER: 0,
+    MISSILE_LAUNCHER: 0,
+    EMP_CANNON: 0,
+    METAL_MARINE_BASE: 0,
+    AA_GUN: 0,
+    GUN_TURRET: 0,
+    LAND_MINE: 0,
+  };
+  for (const b of buildings) {
+    if (b.side === side && b.hp > 0) counts[b.type]++;
+  }
+  return counts;
+};
+
+const updateAiMemory = (state: RuntimeState) => {
+  const memory = state.aiState.memory;
+  const radarOnline = state.buildings.some(
+    (b) => b.side === "ENEMY" && b.type === "RADAR" && isBuildingActive(b, state.elapsed)
+  );
+  for (const b of state.buildings) {
+    if (b.side !== "PLAYER" || b.hp <= 0) continue;
+    if (radarOnline || b.type === "HQ" || b.buildTimeRemaining <= 0) {
+      memory.seenPlayerBuildings[b.id] = { type: b.type, pos: b.pos, lastSeenAt: state.elapsed };
+    }
+  }
+  for (const [id, sighting] of Object.entries(memory.seenPlayerBuildings)) {
+    if (state.elapsed - sighting.lastSeenAt > 90) delete memory.seenPlayerBuildings[id];
+  }
+  const recentIntercepts = state.projectiles.filter(
+    (p) => p.owner === "ENEMY" && p.side === "PLAYER" && p.intercepted
+  ).length;
+  memory.aaProbeScore = Math.max(0, memory.aaProbeScore * 0.98 + recentIntercepts * 0.04);
+};
+
+const scoreAiActions = (
+  state: RuntimeState,
+  mission: MissionDef,
+  counts: Record<BuildingType, number>
+): AiAction[] => {
+  const memory = state.aiState.memory;
+  const agg = mission.enemyAggression;
+  const eco = mission.enemyEcoBias;
+  const actions: AiAction[] = [];
+  const playerTargets = state.buildings.filter((b) => b.side === "PLAYER" && b.hp > 0);
+  const hq = playerTargets.find((b) => b.type === "HQ") ?? playerTargets[0];
+  const playerAa = playerTargets.filter((b) => b.type === "AA_GUN").length;
+  const playerPower = playerTargets.find((b) => b.type === "ENERGY_PLANT") ?? hq;
+  const playerRadar = playerTargets.find((b) => b.type === "RADAR") ?? hq;
+
+  const addBuild = (building: BuildingType, score: number, reason: string) => {
+    const cost = getBuildingCost(state.buildings, "ENEMY", building);
+    if (state.enemyFunds >= cost.funds && state.enemyEnergy >= cost.energy) {
+      actions.push({ kind: "build", building, score, reason });
+    }
+  };
+  const addAttack = (projectile: ProjectileType, target: Building | undefined, score: number, reason: string) => {
+    if (!target) return;
+    const cost = WEAPON_COSTS[projectile];
+    if (state.enemyFunds >= cost.funds && state.enemyEnergy >= cost.energy) {
+      actions.push({ kind: "attack", projectile, target, score, reason });
+    }
+  };
+
+  addBuild("ENERGY_PLANT", 80 * eco - counts.ENERGY_PLANT * 18 + Math.max(0, 180 - state.enemyEnergy) * 0.12, "power-growth");
+  addBuild("SUPPLY_DEPOT", 72 * eco - counts.SUPPLY_DEPOT * 16 + Math.max(0, 350 - state.enemyFunds) * 0.08, "funds-growth");
+  addBuild("AA_GUN", 48 + state.stats.missilesFired * 2 - counts.AA_GUN * 18, "anti-missile-screen");
+  addBuild("MISSILE_LAUNCHER", counts.MISSILE_LAUNCHER ? 15 : 75 + agg * 20, "unlock-strikes");
+  addBuild("METAL_MARINE_BASE", counts.METAL_MARINE_BASE ? 8 : 52 + agg * 45 - playerAa * 4, "ground-assault");
+  addBuild("GUN_TURRET", 32 + state.mechs.filter((m) => m.side === "ENEMY").length * 25 - counts.GUN_TURRET * 14, "base-defense");
+  addBuild("RADAR", counts.RADAR ? 8 : 45 + Object.keys(memory.seenPlayerBuildings).length * 2, "target-intel");
+  addBuild("RADAR_JAMMER", counts.RADAR_JAMMER ? 12 : 42 + playerAa * 9 + agg * 20, "jam-defense");
+  addBuild("EMP_CANNON", counts.EMP_CANNON ? 10 : 48 + playerAa * 6 + (playerPower ? 12 : 0), "disable-grid");
+
+  if (counts.MISSILE_LAUNCHER > 0) {
+    addAttack("DUMMY", hq, state.elapsed - memory.lastProbeAt > 20 ? 50 + playerAa * 12 : 12, "aa-probe");
+    addAttack("ICBM", hq, 44 + agg * 45 - memory.aaProbeScore * 12 - playerAa * 3, "hq-strike");
+    const weakTarget = playerTargets
+      .filter((b) => b.type !== "HQ")
+      .sort((a, b) => a.hp - b.hp || a.pos.y - b.pos.y)[0];
+    addAttack("ICBM", weakTarget, 32 + agg * 20, "finish-weak-asset");
+  }
+  if (counts.METAL_MARINE_BASE > 0) {
+    addAttack("TRANSPORT_POD", playerAa > 2 ? playerRadar : hq, 45 + agg * 50 - playerAa * 5 + memory.aaProbeScore * 5, "mech-drop");
+  }
+  if (counts.EMP_CANNON > 0) {
+    addAttack("EMP", playerPower, 52 + playerAa * 7, "power-disable");
+    addAttack("EMP", playerRadar, 44 + counts.RADAR_JAMMER * 10, "blind-radar");
+  }
+
+  return actions.sort((a, b) => b.score - a.score || a.reason.localeCompare(b.reason));
+};
+
 const aiTick = (state: RuntimeState, mission: MissionDef, dt: number) => {
   const ai = state.aiState;
   ai.nextActionAt -= dt;
@@ -614,86 +846,37 @@ const aiTick = (state: RuntimeState, mission: MissionDef, dt: number) => {
   if (state.elapsed > 25 && ai.phase === "ECO") ai.phase = "ARMY";
   if (state.elapsed > 60 && ai.phase === "ARMY") ai.phase = "ASSAULT";
 
-  // Decide action
-  const eco = mission.enemyEcoBias;
   const agg = mission.enemyAggression;
-
-  const enemyBuildings = state.buildings.filter((b) => b.side === "ENEMY" && b.hp > 0);
-  const counts: Record<BuildingType, number> = {
-    HQ: 0,
-    ENERGY_PLANT: 0,
-    SUPPLY_DEPOT: 0,
-    RADAR: 0,
-    MISSILE_LAUNCHER: 0,
-    METAL_MARINE_BASE: 0,
-    AA_GUN: 0,
-    GUN_TURRET: 0,
-    LAND_MINE: 0,
-  };
-  for (const b of enemyBuildings) counts[b.type]++;
-
-  const wantBuild = (): BuildingType | null => {
-    if (counts.ENERGY_PLANT < 1 + Math.floor(eco * 2)) return "ENERGY_PLANT";
-    if (counts.SUPPLY_DEPOT < 1 + Math.floor(eco * 3)) return "SUPPLY_DEPOT";
-    if (counts.AA_GUN < 1 + Math.floor((1 - agg) * 2 + 1)) return "AA_GUN";
-    if (counts.MISSILE_LAUNCHER < 1) return "MISSILE_LAUNCHER";
-    if (counts.METAL_MARINE_BASE < 1 && agg > 0.5) return "METAL_MARINE_BASE";
-    if (counts.GUN_TURRET < 2) return "GUN_TURRET";
-    if (Math.random() < 0.4) return "ENERGY_PLANT";
-    if (Math.random() < 0.4) return "SUPPLY_DEPOT";
-    return "AA_GUN";
-  };
-
-  const chooseAttack = (): { type: ProjectileType; tx: number; ty: number } | null => {
-    // Pick a random known player building (or HQ) on enemy side awareness (no fog for AI)
-    const targets = state.buildings.filter((b) => b.side === "PLAYER" && b.hp > 0);
-    if (!targets.length) return null;
-    // Slight weighting toward HQ
-    const t =
-      Math.random() < 0.3
-        ? targets.find((b) => b.type === "HQ") ?? targets[0]
-        : targets[Math.floor(Math.random() * targets.length)];
-    const w = tileToWorld("PLAYER", t.pos.x, t.pos.y);
-    // AI randomly chooses dummy vs ICBM vs pod based on phase + agg
-    let r = Math.random();
-    if (ai.phase === "ASSAULT" && counts.METAL_MARINE_BASE > 0 && r < 0.25 * agg) {
-      return { type: "TRANSPORT_POD", tx: w.x, ty: w.y };
-    }
-    if (counts.MISSILE_LAUNCHER > 0) {
-      if (r < 0.15 * (1 - agg)) return { type: "DUMMY", tx: w.x, ty: w.y };
-      return { type: "ICBM", tx: w.x, ty: w.y };
-    }
-    return null;
-  };
-
-  // Mix building & attacking
-  const doBuild = ai.phase === "ECO" || (Math.random() < 0.55 && ai.phase !== "ASSAULT");
-  if (doBuild) {
-    const want = wantBuild();
-    if (want) {
-      // Try a few random tiles
-      for (let i = 0; i < 18; i++) {
-        const x = 2 + Math.floor(Math.random() * (GRID_W - 4));
-        const y = 2 + Math.floor(Math.random() * (GRID_H - 4));
-        if (buildBuilding(state, "ENEMY", want, x, y)) {
-          ai.builtCount++;
-          break;
-        }
+  const counts = countBuildingsByType(state.buildings, "ENEMY");
+  updateAiMemory(state);
+  const action = scoreAiActions(state, mission, counts)[0];
+  if (action?.kind === "build") {
+    for (let i = 0; i < 24; i++) {
+      const spread = i < 10 ? 2 : 1;
+      const x = rngInt(state, spread, GRID_W - spread);
+      const y = rngInt(state, spread, GRID_H - spread);
+      if (buildBuilding(state, "ENEMY", action.building, x, y)) {
+        ai.builtCount++;
+        ai.memory.lastDecision = `build:${action.building}:${action.reason}:${action.score.toFixed(1)}`;
+        break;
       }
     }
-  } else {
-    const attack = chooseAttack();
-    if (attack) launchMissile(state, "ENEMY", attack.type, attack.tx, attack.ty);
+  } else if (action?.kind === "attack") {
+    const w = tileToWorld("PLAYER", action.target.pos.x, action.target.pos.y);
+    if (launchMissile(state, "ENEMY", action.projectile, w.x, w.y)) {
+      if (action.projectile === "DUMMY") ai.memory.lastProbeAt = state.elapsed;
+      ai.memory.lastDecision = `attack:${action.projectile}:${action.reason}:${action.score.toFixed(1)}`;
+    }
   }
 
   // Schedule next action
   const base = ai.phase === "ECO" ? 4.5 : ai.phase === "ARMY" ? 3.2 : 2.0;
-  ai.nextActionAt = base * (0.7 + Math.random() * 0.6) * (1.2 - agg * 0.4);
+  ai.nextActionAt = base * rngRange(state, 0.7, 1.3) * (1.2 - agg * 0.4);
 
   // AI defensively launches AA when something inbound
   for (const p of state.projectiles) {
     if (p.owner === "PLAYER" && p.side === "ENEMY" && !p.intercepted) {
-      if (Math.random() < 0.25 * agg) {
+      if (rng(state) < 0.25 * agg) {
         launchAAIntercept(state, "ENEMY", p);
       }
     }
@@ -734,6 +917,7 @@ export const stepGame = (state: RuntimeState, mission: MissionDef, dt: number) =
   tickResources(state, dt);
   tickBuildings(state, dt);
   fullRevealRadar(state);
+  tickJammers(state, dt);
   tickProjectiles(state, dt);
   tickMechs(state, dt);
   tickParticles(state, dt);

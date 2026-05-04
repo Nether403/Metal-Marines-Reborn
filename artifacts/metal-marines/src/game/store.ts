@@ -15,6 +15,7 @@ import {
   uid,
 } from "./engine";
 import { GRID_H, GRID_W } from "./constants";
+import { hashSeed } from "./rng";
 import { getMission, MISSIONS } from "@/data/missions";
 
 const PROGRESS_KEY = "mm2026.progress.v1";
@@ -119,6 +120,7 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
   return {
     status: "PLAYING",
     missionId: mission.id,
+    rngSeed: hashSeed(`${mission.id}:${mission.index}:${mission.difficulty}`),
     startedAt: Date.now(),
     elapsed: 0,
     playerFunds: mission.startFunds,
@@ -140,6 +142,11 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
       phase: "ECO",
       nextActionAt: mission.difficulty <= 1 ? 8 : mission.difficulty <= 2 ? 5 : 3,
       builtCount: 0,
+      memory: {
+        seenPlayerBuildings: {},
+        aaProbeScore: 0,
+        lastProbeAt: -999,
+      },
     },
     stats: {
       missilesFired: 0,
@@ -292,6 +299,13 @@ export const useGame = create<Store>((set, get) => ({
       const parsed = JSON.parse(raw);
       const m = getMission(parsed.missionId);
       if (!m) return null;
+      parsed.runtime.rngSeed ??= hashSeed(`${m.id}:${m.index}:${m.difficulty}`);
+      parsed.runtime.aiState ??= { phase: "ECO", nextActionAt: 3, builtCount: 0 };
+      parsed.runtime.aiState.memory ??= {
+        seenPlayerBuildings: {},
+        aaProbeScore: 0,
+        lastProbeAt: -999,
+      };
       set({ runtime: parsed.runtime, mission: m, paused: false });
       return parsed.missionId as string;
     } catch {

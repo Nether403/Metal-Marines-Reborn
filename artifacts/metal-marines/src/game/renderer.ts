@@ -144,7 +144,9 @@ const buildingFill: Record<string, string> = {
   ENERGY_PLANT: "#06b6d4",
   SUPPLY_DEPOT: "#facc15",
   RADAR: "#8b5cf6",
+  RADAR_JAMMER: "#a855f7",
   MISSILE_LAUNCHER: "#f97316",
+  EMP_CANNON: "#22d3ee",
   METAL_MARINE_BASE: "#ef4444",
   AA_GUN: "#a3e635",
   GUN_TURRET: "#fb923c",
@@ -156,14 +158,16 @@ const buildingGlyph: Record<string, string> = {
   ENERGY_PLANT: "E",
   SUPPLY_DEPOT: "$",
   RADAR: "R",
+  RADAR_JAMMER: "J",
   MISSILE_LAUNCHER: "M",
+  EMP_CANNON: "EMP",
   METAL_MARINE_BASE: "B",
   AA_GUN: "A",
   GUN_TURRET: "T",
   LAND_MINE: "*",
 };
 
-const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolean) => {
+const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolean, now: number) => {
   if (hidden) return;
   const { x: cx, y: cy } = tileToWorld(b.side, b.pos.x, b.pos.y);
   const color = buildingFill[b.type] ?? "#22c55e";
@@ -188,6 +192,19 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
     ctx.fillText(buildingGlyph[b.type] ?? "?", cx, cy + 1);
     ctx.textAlign = "start";
     ctx.textBaseline = "alphabetic";
+  }
+
+  if ((b.disabledUntil ?? 0) > now) {
+    ctx.strokeStyle = "rgba(34,211,238,0.8)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#67e8f9";
+    ctx.font = "bold 7px 'Space Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("EMP", cx, cy - 18);
+    ctx.textAlign = "start";
   }
 
   // HP bar
@@ -227,8 +244,10 @@ const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
   const color =
     p.type === "TRANSPORT_POD"
       ? "#fbbf24"
+      : p.type === "EMP"
+      ? "#22d3ee"
       : p.type === "DUMMY"
-      ? "#94a3b8"
+      ? p.falseSignature ? "#a855f7" : "#94a3b8"
       : p.type === "AA"
       ? "#38bdf8"
       : p.owner === "PLAYER"
@@ -361,7 +380,7 @@ export const renderFrame = (
   for (const b of state.buildings) {
     const hidden =
       b.side === "ENEMY" && !state.fogEnemy[b.pos.y * GRID_W + b.pos.x];
-    drawBuilding(ctx, b, hidden);
+    drawBuilding(ctx, b, hidden, state.elapsed);
   }
   // Mechs
   for (const m of state.mechs) drawMech(ctx, m);

@@ -11,6 +11,9 @@ const time = (s: number) => {
 export default function ResourceBar({ state }: { state: RuntimeState }) {
   const hq = state.buildings.find((b) => b.side === "PLAYER" && b.type === "HQ");
   const hpPct = hq ? Math.max(0, hq.hp / hq.maxHp) : 0;
+  const disabledCount = state.buildings.filter(
+    (b) => b.side === "PLAYER" && b.hp > 0 && (b.disabledUntil ?? 0) > state.elapsed
+  ).length;
   return (
     <div className="flex items-center gap-4 px-4 py-2 bg-black/60 border-b border-primary/30 font-mono text-sm">
       <div className="flex items-center gap-2 text-yellow-300">
@@ -39,6 +42,11 @@ export default function ResourceBar({ state }: { state: RuntimeState }) {
         <Clock className="w-4 h-4" />
         <span className="tabular-nums">{time(state.elapsed)}</span>
       </div>
+      {disabledCount > 0 && (
+        <div className="text-cyan-200 bg-cyan-500/10 border border-cyan-400/30 px-2 py-0.5 rounded uppercase text-xs">
+          EMP LOCK {disabledCount}
+        </div>
+      )}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span>FIRED <span className="text-foreground">{state.stats.missilesFired}</span></span>
         <span>DROPS <span className="text-foreground">{state.stats.marinesDeployed}</span></span>

@@ -17,8 +17,10 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
       b.side === "PLAYER" &&
       b.type === "RADAR" &&
       b.hp > 0 &&
-      b.buildTimeRemaining <= 0
+      b.buildTimeRemaining <= 0 &&
+      (b.disabledUntil ?? 0) <= state.elapsed
   );
+  const jammerActive = state.projectiles.some((p) => p.falseSignature && p.side === "PLAYER");
 
   useEffect(() => {
     const c = canvasRef.current;
@@ -77,11 +79,12 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
       const px = (tx + 0.5) * tw;
       const py = (ty + 0.5) * th;
       ctx.strokeStyle = `rgba(239,68,68,${0.5 + 0.5 * pulse})`;
+      if (p.falseSignature) ctx.strokeStyle = `rgba(168,85,247,${0.45 + 0.45 * pulse})`;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.arc(px, py, 4 + pulse * 3, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = "#ef4444";
+      ctx.fillStyle = p.falseSignature ? "#a855f7" : "#ef4444";
       ctx.beginPath();
       ctx.arc(px, py, 1.8, 0, Math.PI * 2);
       ctx.fill();
@@ -120,7 +123,7 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
               hasRadar ? "text-primary" : "text-muted-foreground/70"
             }
           >
-            {hasRadar ? "ONLINE" : "OFFLINE"}
+            {hasRadar ? (jammerActive ? "JAMMED" : "ONLINE") : "OFFLINE"}
           </span>
         </div>
         <div className="p-2 flex flex-col gap-1.5">

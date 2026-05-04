@@ -18,6 +18,7 @@ export default function AlertStack({ state }: { state: RuntimeState }) {
         >
           <AlertTriangle className="w-3.5 h-3.5" />
           <span className="font-bold">{a.text}</span>
+          {a.suggestion && <span className="text-[10px] opacity-80 normal-case">// {a.suggestion}</span>}
         </div>
       ))}
     </div>

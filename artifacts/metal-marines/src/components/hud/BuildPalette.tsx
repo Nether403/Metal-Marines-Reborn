@@ -1,4 +1,5 @@
 import { BUILDINGS, WEAPON_COSTS, WEAPON_LABELS } from "@/game/constants";
+import { formatCostPressure, getBuildingCost } from "@/game/economy";
 import type { BuildingType, ProjectileType, RuntimeState } from "@/game/types";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/utils";
@@ -7,14 +8,16 @@ const buildOrder: BuildingType[] = [
   "ENERGY_PLANT",
   "SUPPLY_DEPOT",
   "RADAR",
+  "RADAR_JAMMER",
   "MISSILE_LAUNCHER",
+  "EMP_CANNON",
   "METAL_MARINE_BASE",
   "AA_GUN",
   "GUN_TURRET",
   "LAND_MINE",
 ];
 
-const weaponOrder: ProjectileType[] = ["ICBM", "DUMMY", "AA", "TRANSPORT_POD"];
+const weaponOrder: ProjectileType[] = ["ICBM", "DUMMY", "AA", "TRANSPORT_POD", "EMP"];
 
 export default function BuildPalette({ state }: { state: RuntimeState }) {
   const selectBuild = useGame((s) => s.selectBuild);
@@ -26,6 +29,9 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
   );
   const hasMechBay = state.buildings.some(
     (b) => b.side === "PLAYER" && b.type === "METAL_MARINE_BASE" && b.hp > 0 && b.buildTimeRemaining <= 0
+  );
+  const hasEmp = state.buildings.some(
+    (b) => b.side === "PLAYER" && b.type === "EMP_CANNON" && b.hp > 0 && b.buildTimeRemaining <= 0 && (b.disabledUntil ?? 0) <= state.elapsed
   );
 
   return (
@@ -39,8 +45,9 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
           <div className="grid grid-cols-4 gap-1.5">
             {buildOrder.map((t) => {
               const spec = BUILDINGS[t];
+              const cost = getBuildingCost(state.buildings, "PLAYER", t);
               const sel = state.selectedBuild === t;
-              const ok = canAfford(spec.costFunds, spec.costEnergy);
+              const ok = canAfford(cost.funds, cost.energy);
               return (
                 <button
                   key={t}
@@ -53,12 +60,12 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                       ? "border-primary/30 hover:border-primary/70 hover:bg-primary/10 text-foreground"
                       : "border-border bg-muted/20 text-muted-foreground/60"
                   )}
-                  title={spec.description}
+                  title={formatCostPressure(state.buildings, "PLAYER", t)}
                 >
                   <span className="text-[14px] leading-none font-bold">{spec.hotkey}</span>
                   <span className="truncate w-full text-center">{spec.name.split(" ")[0]}</span>
                   <span className="text-[9px] text-yellow-300/80">
-                    ${spec.costFunds}{spec.costEnergy ? ` / ${spec.costEnergy}E` : ""}
+                    ${cost.funds}{cost.energy ? ` / ${cost.energy}E` : ""}
                   </span>
                 </button>
               );
@@ -75,7 +82,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
               const cost = WEAPON_COSTS[t];
               const lbl = WEAPON_LABELS[t];
               const sel = state.selectedWeapon === t;
-              const needs = t === "TRANSPORT_POD" ? hasMechBay : hasLauncher;
+              const needs = t === "TRANSPORT_POD" ? hasMechBay : t === "EMP" ? hasEmp : hasLauncher;
               const ok = canAfford(cost.funds, cost.energy) && needs;
               return (
                 <button

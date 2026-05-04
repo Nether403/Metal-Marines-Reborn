@@ -33,12 +33,15 @@ const HOTKEYS_BUILD: Record<string, string> = {
   "6": "AA_GUN",
   "7": "GUN_TURRET",
   "8": "LAND_MINE",
+  "9": "RADAR_JAMMER",
+  "0": "EMP_CANNON",
 };
 const HOTKEYS_WEAPON: Record<string, string> = {
   q: "ICBM",
   w: "DUMMY",
   e: "AA",
   r: "TRANSPORT_POD",
+  t: "EMP",
 };
 
 export default function Play() {

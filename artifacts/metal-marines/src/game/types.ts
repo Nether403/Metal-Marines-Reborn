@@ -5,12 +5,14 @@ export type BuildingType =
   | "ENERGY_PLANT"
   | "SUPPLY_DEPOT"
   | "RADAR"
+  | "RADAR_JAMMER"
   | "MISSILE_LAUNCHER"
+  | "EMP_CANNON"
   | "METAL_MARINE_BASE"
   | "AA_GUN"
   | "GUN_TURRET"
   | "LAND_MINE";
-export type ProjectileType = "ICBM" | "DUMMY" | "AA" | "TRANSPORT_POD";
+export type ProjectileType = "ICBM" | "DUMMY" | "AA" | "TRANSPORT_POD" | "EMP";
 
 export interface Position {
   x: number;
@@ -33,6 +35,7 @@ export interface Building {
   buildTimeRemaining: number;
   buildTimeTotal: number;
   cooldown: number;
+  disabledUntil?: number;
 }
 
 export interface Projectile {
@@ -48,6 +51,7 @@ export interface Projectile {
   speed: number;
   payloadMechId?: string;
   intercepted?: boolean;
+  falseSignature?: boolean;
 }
 
 export interface Mech {
@@ -56,6 +60,9 @@ export interface Mech {
   side: Owner;
   pos: Position;
   targetBuildingId?: string;
+  path?: Position[];
+  pathTargetId?: string;
+  waypointIndex?: number;
   hp: number;
   maxHp: number;
   state: "LANDING" | "WALKING" | "ATTACKING";
@@ -79,6 +86,11 @@ export interface AlertItem {
   text: string;
   level: "info" | "warn" | "crit";
   ts: number;
+  category?: "incoming" | "economy" | "ewarfare" | "combat";
+  worldPos?: Position;
+  side?: Owner;
+  severity?: number;
+  suggestion?: string;
 }
 
 export interface CommanderProfile {
@@ -104,6 +116,11 @@ export interface MissionDef {
   enemyEcoBias: number;
   startFunds: number;
   startEnergy: number;
+  isProcedural?: boolean;
+  proceduralMeta?: {
+    seed: string;
+    validation: string[];
+  };
 }
 
 export interface BuildingSpec {
@@ -136,6 +153,7 @@ export type GameStatus =
 export interface RuntimeState {
   status: GameStatus;
   missionId: string | null;
+  rngSeed: number;
   startedAt: number;
   elapsed: number;
   playerFunds: number;
@@ -157,6 +175,13 @@ export interface RuntimeState {
     phase: "ECO" | "ARMY" | "ASSAULT";
     nextActionAt: number;
     builtCount: number;
+    jammerTick?: number;
+    memory: {
+      seenPlayerBuildings: Record<string, { type: BuildingType; pos: Position; lastSeenAt: number }>;
+      aaProbeScore: number;
+      lastProbeAt: number;
+      lastDecision?: string;
+    };
   };
   stats: {
     missilesFired: number;

@@ -1,5 +1,6 @@
 import type { MissionDef, Tile, TerrainType } from "@/game/types";
 import { GRID_W, GRID_H } from "@/game/constants";
+import { createProceduralMission } from "@/game/procedural";
 
 const T = (s: string): Tile[] => {
   const tiles: Tile[] = [];
@@ -289,4 +290,12 @@ export const MISSIONS: MissionDef[] = [
   },
 ];
 
-export const getMission = (id: string) => MISSIONS.find((m) => m.id === id);
+export const getMission = (id: string) => {
+  const fixed = MISSIONS.find((m) => m.id === id);
+  if (fixed) return fixed;
+  if (id.startsWith("skirmish-")) {
+    const seed = id.slice("skirmish-".length) || "reborn";
+    return createProceduralMission({ seed, difficulty: 5, title: "Generated Skirmish" });
+  }
+  return undefined;
+};
