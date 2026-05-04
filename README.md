@@ -108,6 +108,7 @@ Run only Metal Marines:
 
 ```bash
 pnpm --filter metal-marines typecheck
+pnpm --filter metal-marines test:game
 pnpm --filter metal-marines build
 pnpm --filter metal-marines dev
 pnpm --filter metal-marines serve
@@ -144,9 +145,11 @@ The game stores browser-local progress and snapshots in `localStorage`:
 
 As of May 5, 2026:
 
+- `pnpm run build` passes
+- `pnpm --filter @workspace/mockup-sandbox build` passes
+- `pnpm --filter metal-marines test:game` passes
 - `pnpm --filter metal-marines typecheck` passes
 - `pnpm --filter metal-marines build` passes
-- Build emits one non-fatal sourcemap warning from `src/components/ui/tooltip.tsx`
 
 ## Suggested next work
 
