@@ -19,6 +19,7 @@ import type {
   Tile,
 } from "./types";
 import { islandOriginX, projectileCurrentPos, tileToWorld } from "./engine";
+import { spriteManager } from "./sprites";
 
 const TERRAIN_FILL: Record<string, string> = {
   GRASS: "#0e3b2c",
@@ -34,6 +35,28 @@ const TERRAIN_ACCENT: Record<string, string> = {
   MOUNTAIN: "#374151",
   WATER: "#1e3a5f",
   TOXIC_SLUDGE: "#a3e635",
+};
+
+const terrainSpriteKey: Record<string, string> = {
+  GRASS: "terrain.grass.base",
+  FOREST: "terrain.forest.base",
+  MOUNTAIN: "terrain.mountain.base",
+  WATER: "terrain.water.base",
+  TOXIC_SLUDGE: "terrain.toxic_sludge.base",
+};
+
+const buildingSpriteKey = (b: Building, now: number): string => {
+  const owner = b.side === "PLAYER" ? "player" : "enemy";
+  const type = b.type.toLowerCase();
+  const state =
+    b.buildTimeRemaining > 0
+      ? "construction"
+      : (b.disabledUntil ?? 0) > now
+      ? "disabled"
+      : b.hp / b.maxHp < 0.35
+      ? "damaged"
+      : "idle";
+  return `building.${type}.${owner}.${state}`;
 };
 
 const drawWaterShimmer = (ctx: CanvasRenderingContext2D, x: number, y: number, t: number) => {
@@ -64,8 +87,13 @@ const drawIsland = (
       const tile = tiles[y * GRID_W + x];
       const px = ox + x * TILE_PX;
       const py = y * TILE_PX;
-      ctx.fillStyle = TERRAIN_FILL[tile.terrain] ?? "#0e3b2c";
-      ctx.fillRect(px, py, TILE_PX, TILE_PX);
+      const drewTerrain = spriteManager.draw(ctx, terrainSpriteKey[tile.terrain] ?? "", px + TILE_PX / 2, py + TILE_PX / 2, {
+        scale: TILE_PX / 64,
+      });
+      if (!drewTerrain) {
+        ctx.fillStyle = TERRAIN_FILL[tile.terrain] ?? "#0e3b2c";
+        ctx.fillRect(px, py, TILE_PX, TILE_PX);
+      }
 
       // Tile outline
       ctx.strokeStyle = "rgba(34,197,94,0.08)";
@@ -215,7 +243,10 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
   if (hidden) return;
   const { x: cx, y: cy } = tileToWorld(b.side, b.pos.x, b.pos.y);
   const color = buildingFill[b.type] ?? "#22c55e";
-  if (b.type === "HQ") {
+  const spriteKey = buildingSpriteKey(b, now);
+  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: TILE_PX / 64 })) {
+    // Sprite rendered successfully; overlays below still show EMP/progress/HP.
+  } else if (b.type === "HQ") {
     drawHQGlyph(ctx, cx, cy, color);
   } else if (b.type === "LAND_MINE") {
     if (b.side === "PLAYER") {

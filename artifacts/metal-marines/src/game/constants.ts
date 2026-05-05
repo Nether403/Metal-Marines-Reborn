@@ -2,10 +2,11 @@ import type { BuildingSpec, BuildingType, ProjectileType } from "./types";
 
 export const GRID_W = 12;
 export const GRID_H = 10;
-export const TILE_PX = 44;
+export const TILE_PX = 64;
+export const tileUnits = (tiles: number) => tiles * TILE_PX;
 export const ISLAND_PX_W = GRID_W * TILE_PX;
 export const ISLAND_PX_H = GRID_H * TILE_PX;
-export const SKY_GAP_PX = 180;
+export const SKY_GAP_PX = tileUnits(3);
 export const WORLD_W = ISLAND_PX_W * 2 + SKY_GAP_PX;
 export const WORLD_H = ISLAND_PX_H + 60;
 
@@ -62,15 +63,15 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 6,
     maxHp: 180,
     description: "Electronic warfare array. Creates uncertain radar signatures and degrades enemy intercept confidence.",
-    range: 260,
+    range: tileUnits(6),
   },
   TUNNEL_ENTRANCE: {
     type: "TUNNEL_ENTRANCE",
     name: "Tunnel Gate",
     hotkey: "-",
-    costFunds: 240,
-    costEnergy: 70,
-    buildTime: 7,
+    costFunds: 200,
+    costEnergy: 55,
+    buildTime: 6,
     maxHp: 220,
     description: "Links mechs into the subterranean grid, bypassing normal radar and surface chokepoints.",
   },
@@ -83,18 +84,18 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 5,
     maxHp: 150,
     description: "Detects underground movement and exposes tunnel incursions for counter-battery fire.",
-    range: 150,
+    range: tileUnits(3.5),
   },
   TERRAIN_DESTABILIZER: {
     type: "TERRAIN_DESTABILIZER",
     name: "Destabilizer",
     hotkey: "[",
-    costFunds: 460,
-    costEnergy: 150,
-    buildTime: 9,
+    costFunds: 540,
+    costEnergy: 180,
+    buildTime: 11,
     maxHp: 190,
     description: "Mutates enemy terrain into short-lived toxic sludge chokepoints.",
-    range: 520,
+    range: tileUnits(11.8),
   },
   WEATHER_CONTROL: {
     type: "WEATHER_CONTROL",
@@ -105,7 +106,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 10,
     maxHp: 210,
     description: "Triggers deterministic dust storms, floods, or tremors across the battlespace.",
-    range: 520,
+    range: tileUnits(11.8),
   },
   BIOSPHERE_ENGINE: {
     type: "BIOSPHERE_ENGINE",
@@ -116,7 +117,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 8,
     maxHp: 220,
     description: "Regenerates damaged biomes and boosts nearby economy infrastructure.",
-    range: 96,
+    range: tileUnits(2.2),
   },
   MISSILE_LAUNCHER: {
     type: "MISSILE_LAUNCHER",
@@ -137,7 +138,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 8,
     maxHp: 240,
     description: "Launches EMP strikes that temporarily disable enemy power, radar, and defense buildings.",
-    range: 520,
+    range: tileUnits(11.8),
   },
   METAL_MARINE_BASE: {
     type: "METAL_MARINE_BASE",
@@ -158,7 +159,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 4,
     maxHp: 220,
     description: "Auto-fires interceptors at incoming missiles & pods.",
-    range: 220,
+    range: tileUnits(5),
     fireRate: 1.2,
   },
   GUN_TURRET: {
@@ -170,7 +171,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 3,
     maxHp: 260,
     description: "Anti-mech ground turret. Shreds landed Marines.",
-    range: 110,
+    range: tileUnits(2.5),
     fireRate: 0.6,
     damage: 14,
   },
@@ -224,22 +225,22 @@ export const WEAPON_LABELS: Record<ProjectileType, { name: string; hotkey: strin
 };
 
 export const ICBM_DAMAGE = 280;
-export const ICBM_SPLASH = 60;
+export const ICBM_SPLASH = tileUnits(1.35);
 export const MECH_HP = 220;
 export const MECH_DAMAGE = 28;
-export const MECH_SPEED = 28;
+export const MECH_SPEED = tileUnits(0.65);
 export const MECH_ATTACK_COOLDOWN = 0.7;
-export const EMP_SPLASH = 72;
+export const EMP_SPLASH = tileUnits(1.65);
 export const EMP_DISABLE_SECONDS = 10;
 export const JAMMER_FALSE_SIGNATURE_INTERVAL = 7;
 export const TUNNEL_MOVE_MULTIPLIER = 0.82;
 export const TUNNEL_TRANSITION_SECONDS = 1.4;
-export const SEISMIC_SENSOR_RANGE = 140;
+export const SEISMIC_SENSOR_RANGE = tileUnits(3.2);
 export const SEISMIC_DETECTION_SECONDS = 3.5;
-export const TUNNEL_COLLAPSE_RADIUS = 58;
+export const TUNNEL_COLLAPSE_RADIUS = tileUnits(1.3);
 export const TUNNEL_COLLAPSE_SECONDS = 16;
-export const TOXIC_SLUDGE_SECONDS = 20;
-export const TERRAIN_DESTABILIZER_COOLDOWN = 26;
+export const TOXIC_SLUDGE_SECONDS = 16;
+export const TERRAIN_DESTABILIZER_COOLDOWN = 32;
 export const WEATHER_CONTROL_COOLDOWN = 54;
 export const BIOSPHERE_ENGINE_COOLDOWN = 18;
 export const BIOSPHERE_ECONOMY_BONUS = 0.06;

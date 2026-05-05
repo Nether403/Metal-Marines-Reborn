@@ -14,6 +14,7 @@ import {
   WEAPON_LABELS,
 } from "@/game/constants";
 import { worldToTile, inIsland } from "@/game/engine";
+import { preloadGameSprites } from "@/game/sprites";
 import type { Owner } from "@/game/types";
 import ResourceBar from "@/components/hud/ResourceBar";
 import BuildPalette from "@/components/hud/BuildPalette";
@@ -71,9 +72,11 @@ export default function Play() {
   const clearSnapshot = useGame((s) => s.clearSnapshot);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(performance.now());
   const hoverRef = useRef<{ side: Owner; x: number; y: number } | null>(null);
+  const [canvasCssSize, setCanvasCssSize] = useState({ width: WORLD_W, height: WORLD_H });
   const [showBriefing, setShowBriefing] = useState(() => {
     if (typeof window === "undefined") return true;
     return !new URLSearchParams(window.location.search).has("engage");
@@ -92,6 +95,10 @@ export default function Play() {
       );
     }
   }, [missionId, startMission]);
+
+  useEffect(() => {
+    void preloadGameSprites();
+  }, []);
 
   // Game loop
   useEffect(() => {
@@ -119,6 +126,30 @@ export default function Play() {
     if (!c) return;
     c.width = WORLD_W;
     c.height = WORLD_H;
+  }, []);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    const fitCanvas = () => {
+      const availableW = stage.clientWidth;
+      const availableH = stage.clientHeight;
+      const scale = Math.min(availableW / WORLD_W, availableH / WORLD_H, 1);
+      setCanvasCssSize({
+        width: Math.max(1, Math.floor(WORLD_W * scale)),
+        height: Math.max(1, Math.floor(WORLD_H * scale)),
+      });
+    };
+
+    fitCanvas();
+    const observer = new ResizeObserver(fitCanvas);
+    observer.observe(stage);
+    window.addEventListener("resize", fitCanvas);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", fitCanvas);
+    };
   }, []);
 
   const handleCanvasClick = useCallback(
@@ -236,11 +267,12 @@ export default function Play() {
       <ResourceBar state={runtime} />
 
       {/* Canvas region */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black">
+      <div ref={stageRef} className="flex-1 relative overflow-hidden flex items-center justify-center bg-black">
         <div
           className="relative"
           style={{
-            width: "min(100%, calc((100vh - 280px) * " + (WORLD_W / WORLD_H) + "))",
+            width: canvasCssSize.width,
+            height: canvasCssSize.height,
             aspectRatio: `${WORLD_W} / ${WORLD_H}`,
           }}
         >

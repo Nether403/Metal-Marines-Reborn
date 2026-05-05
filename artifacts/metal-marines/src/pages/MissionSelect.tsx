@@ -76,7 +76,7 @@ export default function MissionSelect() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="bg-card/60 transition-colors group relative overflow-hidden border-secondary/40 hover:border-secondary/80">
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary/10 to-transparent opacity-80" />
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary/10 to-transparent opacity-80 pointer-events-none" />
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
@@ -123,7 +123,7 @@ export default function MissionSelect() {
                     : "border-border/50 opacity-60 grayscale"
                 }`}
               >
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">

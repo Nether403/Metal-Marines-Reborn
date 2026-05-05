@@ -91,10 +91,12 @@ export default function HowToPlay() {
             <CardContent className="p-6 space-y-3">
               <h2 className="text-lg font-bold text-secondary font-mono uppercase">05 :: Subterranean Warfare</h2>
               <ul className="text-sm space-y-2">
-                <li>Press <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono">V</kbd> to toggle the surface and tunnel views.</li>
-                <li>Tunnel Gates connect nearby tunnel cells. Metal Marines can use them to bypass surface chokepoints.</li>
-                <li>Underground mechs are hidden unless you are viewing tunnels or they are exposed by Seismic Sensors.</li>
-                <li>Tunnel Busters collapse tunnel cells for a limited time. Any underground unit in the blast zone is lost.</li>
+                <li>Press <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono">V</kbd> to toggle between surface and tunnel views. Underground units are invisible on the surface view.</li>
+                <li><b className="text-amber-300">Tunnel Gates</b> (hotkey <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono">-</kbd>) connect nearby tunnel cells. Metal Marines enter the tunnel network from the Gate and move at 82% surface speed underground.</li>
+                <li>Underground mechs are hidden unless the enemy has an active <b className="text-cyan-200">Seismic Sensor</b> within range — it reveals any subterranean unit within 140px for 3.5 seconds.</li>
+                <li>The <b className="text-orange-300">Tunnel Buster</b> weapon collapses tunnel cells for {Math.round(16)}s. Any underground unit caught in the blast radius is destroyed immediately.</li>
+                <li>Tunnel movement is best used to flank past Gun Turrets and Land Mines that block the surface approach. Route your mechs underground, surface behind the defensive line, then assault the HQ directly.</li>
+                <li>Counter-play: build Seismic Sensors at chokepoints and keep a Tunnel Buster salvo ready. A well-timed Buster after a sensor ping can wipe an entire mech squad mid-transit.</li>
               </ul>
             </CardContent>
           </Card>
@@ -103,11 +105,11 @@ export default function HowToPlay() {
             <CardContent className="p-6 space-y-3">
               <h2 className="text-lg font-bold text-secondary font-mono uppercase">06 :: Ecological Warfare</h2>
               <ul className="text-sm space-y-2">
-                <li><b className="text-lime-300">Toxic sludge</b> blocks surface movement and construction until it decays.</li>
-                <li><b className="text-yellow-300">Dust storms</b> slow surface mech movement and reduce battlefield clarity.</li>
-                <li><b className="text-sky-300">Floods</b> further slow surface movement across the island grid.</li>
-                <li><b className="text-amber-300">Tremors</b> make defensive fire less reliable while active.</li>
-                <li>Biosphere Engines shorten harmful terrain effects and improve nearby resource generation.</li>
+                <li><b className="text-lime-300">Toxic sludge</b> (Destabilizer, hotkey <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono">[</kbd>) blocks surface movement and construction for 16 seconds. Has a 32-second cooldown. Best used to deny enemy rebuild zones or cut supply lines.</li>
+                <li><b className="text-yellow-300">Dust storms</b> reduce mech move speed by ~8% and make the battlefield harder to read. Combined with a mech assault, the speed penalty compounds the defender's reaction time.</li>
+                <li><b className="text-sky-300">Floods</b> slow surface movement further and stack with dust storm penalties. Trigger floods first, then storm — the combined effect can pin a mech column in place.</li>
+                <li><b className="text-amber-300">Tremors</b> impose a 12% defensive fire penalty while active (20s duration). Fire ICBMs during a tremor to reduce the chance of AA interception.</li>
+                <li>The <b className="text-green-300">Biosphere Engine</b> (hotkey <kbd className="bg-muted px-1.5 py-0.5 rounded font-mono">\</kbd>) regenerates damaged terrain faster, shortens toxic sludge and flood effects on your island, and adds 6% to nearby resource building output. Build one early if you expect heavy ecological pressure.</li>
               </ul>
             </CardContent>
           </Card>
@@ -130,6 +132,19 @@ export default function HowToPlay() {
                 <div><kbd className="bg-muted px-1.5 py-0.5 rounded">Esc</kbd> Cancel selection</div>
                 <div>Click LEFT to build · RIGHT to fire</div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card/50 border-primary/20">
+            <CardContent className="p-6 space-y-3">
+              <h2 className="text-lg font-bold text-secondary font-mono uppercase">08 :: Tactics</h2>
+              <ul className="text-sm space-y-2">
+                <li><b className="text-emerald-400">Early game:</b> Rush one Energy Plant and one Supply Depot. Your HQ already generates some funds — use that head-start to get a Radar up and sight the enemy island before they sight you.</li>
+                <li><b className="text-yellow-400">Mid game:</b> Secure a Missile Silo and build AA Batteries before going offensive. An undefended island can be crippled by a single ICBM salvo.</li>
+                <li><b className="text-red-400">Mech assaults:</b> Always send mechs in pairs or triplets. Lone marines are easily shredded by a single Gun Turret. Use tunnel routing or EMP first to clear the path.</li>
+                <li><b className="text-sky-400">EMP timing:</b> EMP disables AA Batteries for 10 seconds. Fire your ICBMs immediately after the EMP lands to guarantee they reach undefended targets.</li>
+                <li><b className="text-purple-400">Fog of war:</b> Fire a Dummy to scout unknown areas cheaply. Never waste an ICBM into fog — you need the intel first.</li>
+              </ul>
             </CardContent>
           </Card>
         </div>

@@ -31,6 +31,7 @@ import {
   WEATHER_CONTROL_COOLDOWN,
   WEATHER_DURATION_SECONDS,
   WEAPON_COSTS,
+  tileUnits,
 } from "./constants";
 import { getBuildingCost } from "./economy";
 import { findPathToAdjacentBuilding, isPathableTile } from "./pathfinding";
@@ -166,7 +167,7 @@ export const buildBuilding = (
 const distance = (ax: number, ay: number, bx: number, by: number) =>
   Math.hypot(ax - bx, ay - by);
 
-const MECH_ATTACK_RANGE = TILE_PX + 4;
+const MECH_ATTACK_RANGE = tileUnits(1.1);
 
 const isBuildingActive = (b: Building, now: number): boolean =>
   b.hp > 0 && b.buildTimeRemaining <= 0 && (b.disabledUntil ?? 0) <= now;
@@ -321,7 +322,16 @@ export const launchMissile = (
   const start = tileToWorld(side, launcher.pos.x, launcher.pos.y);
   const target = side === "PLAYER" ? "ENEMY" : "PLAYER";
 
-  const speed = type === "TRANSPORT_POD" ? 90 : type === "AA" ? 280 : type === "EMP" ? 160 : type === "TUNNEL_BUSTER" ? 145 : 130;
+  const speed =
+    type === "TRANSPORT_POD"
+      ? tileUnits(2)
+      : type === "AA"
+      ? tileUnits(6.4)
+      : type === "EMP"
+      ? tileUnits(3.65)
+      : type === "TUNNEL_BUSTER"
+      ? tileUnits(3.3)
+      : tileUnits(2.95);
   const proj: Projectile = {
     id: uid("p"),
     type,
@@ -368,7 +378,7 @@ export const launchAAIntercept = (state: RuntimeState, side: Owner, target: Proj
     targetWX: cur.x,
     targetWY: cur.y,
     progress: 0,
-    speed: 320,
+    speed: tileUnits(7.25),
   };
   state.projectiles.push(proj);
   return true;
@@ -379,7 +389,7 @@ export const projectileCurrentPos = (p: Projectile): Position => {
   const t = p.progress;
   const x = p.startWX + (p.targetWX - p.startWX) * t;
   const baseY = p.startWY + (p.targetWY - p.startWY) * t;
-  const arc = -Math.sin(t * Math.PI) * 220;
+  const arc = -Math.sin(t * Math.PI) * tileUnits(5);
   return { x, y: baseY + arc };
 };
 
