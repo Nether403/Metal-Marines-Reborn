@@ -1,4 +1,5 @@
 # Metal Marines Reborn
+<img width="1013" height="568" alt="image" src="https://github.com/user-attachments/assets/91529f12-cf2f-4325-9fe4-e358920d8404" />
 
 Metal Marines Reborn is a TypeScript/pnpm monorepo centered on **Metal Marines 2026**, a browser-based real-time strategy game built with React, Vite, Zustand, and HTML5 Canvas.
 
