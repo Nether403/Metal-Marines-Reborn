@@ -11,6 +11,7 @@ import {
 } from "./constants";
 import type {
   Building,
+  BuildingType,
   Mech,
   Owner,
   Particle,
@@ -335,6 +336,30 @@ const buildingSpriteKey = (b: Building, now: number): string => {
   return `building.${type}.${owner}.${state}`;
 };
 
+const mechSpriteKey = (m: Mech, time: number): string | null => {
+  const owner = m.owner === "PLAYER" ? "player" : "enemy";
+  const state = m.state.toLowerCase();
+  const animated = spriteManager.animationFrame(`unit.mech.${owner}.${state}`, time * 1000);
+  return animated ?? `unit.mech.${owner}.${state}`;
+};
+
+const factionVisuals: Record<Owner, { primary: string; secondary: string; trim: string; glow: string; glass: string }> = {
+  PLAYER: {
+    primary: "#ef4444",
+    secondary: "#f8fafc",
+    trim: "#991b1b",
+    glow: "rgba(248,113,113,0.55)",
+    glass: "#bae6fd",
+  },
+  ENEMY: {
+    primary: "#d97706",
+    secondary: "#7c3aed",
+    trim: "#451a03",
+    glow: "rgba(216,180,254,0.48)",
+    glass: "#fde68a",
+  },
+};
+
 const drawIsland = (
   ctx: CanvasRenderingContext2D,
   side: Owner,
@@ -425,22 +450,8 @@ const drawIsland = (
   }
 };
 
-const drawHQGlyph = (ctx: CanvasRenderingContext2D, cx: number, cy: number, color: string) => {
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - 16, cy - 14, 32, 26);
-  ctx.fillStyle = "#020617";
-  ctx.fillRect(cx - 12, cy - 10, 24, 12);
-  ctx.fillStyle = color;
-  ctx.fillRect(cx - 4, cy + 2, 8, 10);
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 9px 'Space Mono', monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("HQ", cx, cy + 11);
-  ctx.textAlign = "start";
-};
-
-const buildingFill: Record<string, string> = {
-  HQ: "#22c55e",
+const buildingFill: Record<BuildingType, string> = {
+  HQ: "#ef4444",
   ENERGY_PLANT: "#06b6d4",
   SUPPLY_DEPOT: "#facc15",
   RADAR: "#8b5cf6",
@@ -458,7 +469,7 @@ const buildingFill: Record<string, string> = {
   LAND_MINE: "#64748b",
 };
 
-const buildingGlyph: Record<string, string> = {
+const buildingGlyph: Record<BuildingType, string> = {
   HQ: "HQ",
   ENERGY_PLANT: "E",
   SUPPLY_DEPOT: "$",
@@ -477,34 +488,220 @@ const buildingGlyph: Record<string, string> = {
   LAND_MINE: "*",
 };
 
+const drawRectCentered = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  fill: string | CanvasGradient | CanvasPattern,
+  stroke = "rgba(2,6,23,0.72)"
+) => {
+  ctx.fillStyle = fill;
+  ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cx - w / 2 + 0.5, cy - h / 2 + 0.5, w - 1, h - 1);
+};
+
+const drawIsoPlatform = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  visuals: (typeof factionVisuals)[Owner],
+  accent: string
+) => {
+  const y = cy + 15;
+  ctx.fillStyle = "rgba(2,6,23,0.42)";
+  ctx.beginPath();
+  ctx.ellipse(cx, y + 6, w * 0.58, h * 0.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = visuals.trim;
+  ctx.beginPath();
+  ctx.moveTo(cx, y - h / 2);
+  ctx.lineTo(cx + w / 2, y);
+  ctx.lineTo(cx, y + h / 2);
+  ctx.lineTo(cx - w / 2, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(203,213,225,0.22)";
+  ctx.stroke();
+
+  ctx.fillStyle = accent;
+  ctx.globalAlpha *= 0.28;
+  ctx.beginPath();
+  ctx.moveTo(cx, y - h / 2 + 4);
+  ctx.lineTo(cx + w / 2 - 8, y);
+  ctx.lineTo(cx, y + h / 2 - 4);
+  ctx.lineTo(cx - w / 2 + 8, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha /= 0.28;
+};
+
+const drawConstructionScaffold = (ctx: CanvasRenderingContext2D, cx: number, cy: number, progress: number) => {
+  ctx.save();
+  ctx.strokeStyle = "rgba(125,211,252,0.68)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]);
+  ctx.strokeRect(cx - 21, cy - 23, 42, 42);
+  ctx.setLineDash([]);
+  ctx.fillStyle = `rgba(56,189,248,${0.14 + progress * 0.18})`;
+  ctx.fillRect(cx - 18, cy + 17 - 34 * progress, 36, 34 * progress);
+  ctx.strokeStyle = "rgba(226,232,240,0.38)";
+  ctx.beginPath();
+  ctx.moveTo(cx - 23, cy + 19);
+  ctx.lineTo(cx + 23, cy - 23);
+  ctx.moveTo(cx + 23, cy + 19);
+  ctx.lineTo(cx - 23, cy - 23);
+  ctx.stroke();
+  ctx.restore();
+};
+
+const drawBuildingLabel = (ctx: CanvasRenderingContext2D, cx: number, cy: number, type: BuildingType) => {
+  ctx.fillStyle = "rgba(2,6,23,0.76)";
+  ctx.fillRect(cx - 13, cy - 5, 26, 11);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "bold 8px 'Space Mono', monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(buildingGlyph[type] ?? "?", cx, cy + 1);
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+};
+
+const drawProceduralBuilding = (ctx: CanvasRenderingContext2D, b: Building, cx: number, cy: number, now: number) => {
+  const visuals = factionVisuals[b.side];
+  const accent = buildingFill[b.type] ?? visuals.primary;
+  const damaged = b.hp / b.maxHp < 0.35;
+  const constructing = b.buildTimeRemaining > 0 && b.buildTimeTotal > 0;
+  const disabled = (b.disabledUntil ?? 0) > now;
+  const progress = constructing ? 1 - b.buildTimeRemaining / b.buildTimeTotal : 1;
+
+  ctx.save();
+  if (damaged) ctx.globalAlpha *= 0.82;
+  drawIsoPlatform(ctx, cx, cy, b.type === "HQ" ? 58 : 46, b.type === "HQ" ? 24 : 18, visuals, accent);
+
+  const metal = ctx.createLinearGradient(cx - 20, cy - 28, cx + 20, cy + 20);
+  metal.addColorStop(0, visuals.secondary);
+  metal.addColorStop(0.36, accent);
+  metal.addColorStop(1, "#020617");
+
+  switch (b.type) {
+    case "HQ":
+      drawRectCentered(ctx, cx, cy - 7, 38, 32, metal, visuals.glow);
+      drawRectCentered(ctx, cx, cy - 25, 22, 12, visuals.secondary, "rgba(2,6,23,0.7)");
+      drawRectCentered(ctx, cx - 13, cy - 3, 7, 17, visuals.glass);
+      drawRectCentered(ctx, cx + 13, cy - 3, 7, 17, visuals.glass);
+      break;
+    case "ENERGY_PLANT":
+      drawRectCentered(ctx, cx - 10, cy - 5, 18, 31, metal);
+      drawRectCentered(ctx, cx + 11, cy - 4, 15, 35, "#083344", "rgba(103,232,249,0.7)");
+      ctx.strokeStyle = "rgba(103,232,249,0.85)";
+      ctx.beginPath();
+      ctx.arc(cx + 11, cy - 5, 11, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    case "SUPPLY_DEPOT":
+      drawRectCentered(ctx, cx - 10, cy - 3, 20, 24, metal);
+      drawRectCentered(ctx, cx + 11, cy - 1, 18, 20, "#713f12", "rgba(250,204,21,0.55)");
+      drawRectCentered(ctx, cx, cy - 18, 34, 7, visuals.secondary);
+      break;
+    case "RADAR":
+    case "RADAR_JAMMER":
+      drawRectCentered(ctx, cx, cy + 1, 20, 24, metal);
+      ctx.strokeStyle = b.type === "RADAR" ? "rgba(125,211,252,0.86)" : "rgba(216,180,254,0.86)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy - 18, 15, Math.PI * 1.1, Math.PI * 1.9);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 15);
+      ctx.lineTo(cx, cy + 4);
+      ctx.stroke();
+      break;
+    case "MISSILE_LAUNCHER":
+    case "EMP_CANNON":
+      drawRectCentered(ctx, cx, cy + 1, 32, 20, metal);
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.moveTo(cx - 5, cy - 25);
+      ctx.lineTo(cx + 8, cy - 2);
+      ctx.lineTo(cx - 14, cy - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(2,6,23,0.68)";
+      ctx.stroke();
+      break;
+    case "METAL_MARINE_BASE":
+      drawRectCentered(ctx, cx, cy + 1, 38, 22, metal);
+      drawRectCentered(ctx, cx, cy - 13, 24, 12, "#111827", visuals.glow);
+      drawRectCentered(ctx, cx - 10, cy + 4, 7, 13, visuals.secondary);
+      drawRectCentered(ctx, cx + 10, cy + 4, 7, 13, visuals.secondary);
+      break;
+    case "AA_GUN":
+    case "GUN_TURRET":
+      drawRectCentered(ctx, cx, cy + 4, 30, 17, metal);
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 5);
+      ctx.lineTo(cx + 18, cy - 22);
+      ctx.stroke();
+      ctx.lineWidth = 2;
+      break;
+    case "LAND_MINE":
+      ctx.fillStyle = b.side === "PLAYER" ? "rgba(148,163,184,0.76)" : "rgba(15,23,42,0.36)";
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + 5, 11, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    default:
+      drawRectCentered(ctx, cx, cy, 31, 29, metal);
+      drawRectCentered(ctx, cx, cy - 18, 16, 8, accent, visuals.glow);
+      break;
+  }
+
+  if (constructing) drawConstructionScaffold(ctx, cx, cy, progress);
+  if (damaged) {
+    ctx.strokeStyle = "rgba(2,6,23,0.85)";
+    ctx.beginPath();
+    ctx.moveTo(cx - 12, cy - 18);
+    ctx.lineTo(cx - 2, cy - 8);
+    ctx.lineTo(cx - 7, cy + 5);
+    ctx.moveTo(cx + 12, cy - 13);
+    ctx.lineTo(cx + 4, cy - 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(71,85,105,0.36)";
+    ctx.beginPath();
+    ctx.arc(cx + 16, cy - 20, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (disabled) {
+    ctx.strokeStyle = "rgba(34,211,238,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(cx - 18, cy - 23);
+    ctx.lineTo(cx + 18, cy + 15);
+    ctx.moveTo(cx + 18, cy - 23);
+    ctx.lineTo(cx - 18, cy + 15);
+    ctx.stroke();
+  }
+  drawBuildingLabel(ctx, cx, cy + 8, b.type);
+  ctx.restore();
+};
+
 const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolean, now: number) => {
   if (hidden) return;
   const { x: cx, y: cy } = tileToWorld(b.side, b.pos.x, b.pos.y);
-  const color = buildingFill[b.type] ?? "#22c55e";
   const spriteKey = buildingSpriteKey(b, now);
   if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: TILE_PX / 64 })) {
     // Sprite rendered successfully; overlays below still show EMP/progress/HP.
-  } else if (b.type === "HQ") {
-    drawHQGlyph(ctx, cx, cy, color);
-  } else if (b.type === "LAND_MINE") {
-    if (b.side === "PLAYER") {
-      ctx.fillStyle = "rgba(100,116,139,0.6)";
-      ctx.beginPath();
-      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
   } else {
-    ctx.fillStyle = color;
-    ctx.fillRect(cx - 14, cy - 14, 28, 28);
-    ctx.strokeStyle = "rgba(0,0,0,0.4)";
-    ctx.strokeRect(cx - 14 + 0.5, cy - 14 + 0.5, 27, 27);
-    ctx.fillStyle = "#020617";
-    ctx.font = "bold 14px 'Space Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(buildingGlyph[b.type] ?? "?", cx, cy + 1);
-    ctx.textAlign = "start";
-    ctx.textBaseline = "alphabetic";
+    drawProceduralBuilding(ctx, b, cx, cy, now);
   }
 
   if ((b.disabledUntil ?? 0) > now) {
@@ -585,30 +782,96 @@ const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
   }
 };
 
-const drawMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
-  const c = m.owner === "PLAYER" ? "#22c55e" : "#f87171";
+const drawProceduralMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
+  const visuals = factionVisuals[m.owner];
   const underground = (m.layer ?? "SURFACE") === "UNDERGROUND";
-  ctx.globalAlpha = underground ? 0.62 : 1;
+  const walkTick = m.state === "WALKING" ? Math.sin((m.pos.x + m.pos.y) * 0.12) : 0;
+  const attackPose = m.state === "ATTACKING" ? 1 : 0;
+
+  ctx.save();
+  ctx.globalAlpha *= underground ? 0.62 : 1;
   if (underground) {
     ctx.strokeStyle = m.detectedUntil ? "#fbbf24" : "rgba(251,191,36,0.45)";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(m.pos.x, m.pos.y, 11, 0, Math.PI * 2);
+    ctx.arc(m.pos.x, m.pos.y, 18, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(251,191,36,0.2)";
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(m.pos.x - 17, m.pos.y + i * 6);
+      ctx.lineTo(m.pos.x + 17, m.pos.y + i * 6);
+      ctx.stroke();
+    }
+  }
+
+  ctx.fillStyle = "rgba(2,6,23,0.38)";
+  ctx.beginPath();
+  ctx.ellipse(m.pos.x, m.pos.y + 13, 16, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const body = ctx.createLinearGradient(m.pos.x - 11, m.pos.y - 17, m.pos.x + 13, m.pos.y + 11);
+  body.addColorStop(0, visuals.secondary);
+  body.addColorStop(0.4, visuals.primary);
+  body.addColorStop(1, visuals.trim);
+
+  // legs
+  drawRectCentered(ctx, m.pos.x - 6, m.pos.y + 8 + walkTick * 2, 5, 15, visuals.trim, "rgba(2,6,23,0.72)");
+  drawRectCentered(ctx, m.pos.x + 6, m.pos.y + 8 - walkTick * 2, 5, 15, visuals.trim, "rgba(2,6,23,0.72)");
+  drawRectCentered(ctx, m.pos.x - 7, m.pos.y + 17 + walkTick * 2, 9, 4, visuals.secondary, "rgba(2,6,23,0.72)");
+  drawRectCentered(ctx, m.pos.x + 7, m.pos.y + 17 - walkTick * 2, 9, 4, visuals.secondary, "rgba(2,6,23,0.72)");
+
+  // arms / weapon pods
+  ctx.strokeStyle = visuals.trim;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(m.pos.x - 9, m.pos.y - 5);
+  ctx.lineTo(m.pos.x - 18, m.pos.y + 2 + walkTick);
+  ctx.moveTo(m.pos.x + 9, m.pos.y - 5);
+  ctx.lineTo(m.pos.x + 20 + attackPose * 4, m.pos.y - 9 - attackPose * 5);
+  ctx.stroke();
+
+  ctx.fillStyle = body;
+  ctx.fillRect(m.pos.x - 11, m.pos.y - 15, 22, 24);
+  ctx.strokeStyle = "rgba(2,6,23,0.82)";
+  ctx.lineWidth = 1.25;
+  ctx.strokeRect(m.pos.x - 10.5, m.pos.y - 14.5, 21, 23);
+
+  // cockpit/head
+  drawRectCentered(ctx, m.pos.x, m.pos.y - 18, 13, 8, visuals.glass, "rgba(2,6,23,0.72)");
+  ctx.fillStyle = visuals.secondary;
+  ctx.fillRect(m.pos.x - 8, m.pos.y - 6, 16, 3);
+
+  // weapon glow if attacking
+  if (m.state === "ATTACKING") {
+    ctx.fillStyle = visuals.glow;
+    ctx.beginPath();
+    ctx.arc(m.pos.x + 24, m.pos.y - 15, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = visuals.secondary;
+    ctx.beginPath();
+    ctx.moveTo(m.pos.x + 17, m.pos.y - 11);
+    ctx.lineTo(m.pos.x + 28, m.pos.y - 17);
     ctx.stroke();
   }
-  ctx.fillStyle = c;
-  ctx.fillRect(m.pos.x - 6, m.pos.y - 8, 12, 12);
-  ctx.fillRect(m.pos.x - 4, m.pos.y + 4, 3, 6);
-  ctx.fillRect(m.pos.x + 1, m.pos.y + 4, 3, 6);
-  ctx.fillStyle = "#fde68a";
-  ctx.fillRect(m.pos.x - 2, m.pos.y - 5, 4, 2);
+
   // hp
   if (m.hp < m.maxHp) {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
-    ctx.fillRect(m.pos.x - 8, m.pos.y - 14, 16, 2);
-    ctx.fillStyle = "#22c55e";
-    ctx.fillRect(m.pos.x - 8, m.pos.y - 14, 16 * (m.hp / m.maxHp), 2);
+    ctx.fillRect(m.pos.x - 13, m.pos.y - 28, 26, 3);
+    ctx.fillStyle = m.hp / m.maxHp > 0.35 ? "#22c55e" : "#ef4444";
+    ctx.fillRect(m.pos.x - 13, m.pos.y - 28, 26 * (m.hp / m.maxHp), 3);
   }
-  ctx.globalAlpha = 1;
+  ctx.restore();
+};
+
+const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
+  const spriteKey = mechSpriteKey(m, time);
+  const underground = (m.layer ?? "SURFACE") === "UNDERGROUND";
+  if (spriteKey && spriteManager.draw(ctx, spriteKey, m.pos.x, m.pos.y, { scale: TILE_PX / 64, alpha: underground ? 0.62 : 1 })) {
+    return;
+  }
+  drawProceduralMech(ctx, m);
 };
 
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
@@ -783,7 +1046,7 @@ export const renderFrame = (
   // Mechs
   for (const m of state.mechs) {
     const isUnderground = (m.layer ?? "SURFACE") === "UNDERGROUND";
-    if (!isUnderground || underground || (m.detectedUntil ?? 0) > state.elapsed) drawMech(ctx, m);
+    if (!isUnderground || underground || (m.detectedUntil ?? 0) > state.elapsed) drawMech(ctx, m, time);
   }
   // Projectiles
   for (const p of state.projectiles) drawProjectile(ctx, p);
