@@ -126,7 +126,7 @@ export default function Play() {
     if (!c) return;
     c.width = WORLD_W;
     c.height = WORLD_H;
-  }, []);
+  }, [runtime?.missionId]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -150,7 +150,7 @@ export default function Play() {
       observer.disconnect();
       window.removeEventListener("resize", fitCanvas);
     };
-  }, []);
+  }, [runtime?.missionId]);
 
   const handleCanvasClick = useCallback(
     (ev: React.MouseEvent<HTMLCanvasElement>) => {

@@ -739,47 +739,136 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
   }
 };
 
-const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
-  // Smoke trail
-  for (let i = 0; i < 8; i++) {
-    const tt = Math.max(0, p.progress - i * 0.025);
-    const tx = p.startWX + (p.targetWX - p.startWX) * tt;
-    const ty = p.startWY + (p.targetWY - p.startWY) * tt - Math.sin(tt * Math.PI) * 220;
-    ctx.fillStyle = `rgba(148,163,184,${0.05 * (8 - i)})`;
-    ctx.beginPath();
-    ctx.arc(tx, ty, 3 + i * 0.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const cur = projectileCurrentPos(p);
-  const color =
-    p.type === "TRANSPORT_POD"
-      ? "#fbbf24"
-      : p.type === "EMP"
-      ? "#22d3ee"
-      : p.type === "TUNNEL_BUSTER"
-      ? "#f59e0b"
-      : p.type === "DUMMY"
-      ? p.falseSignature ? "#a855f7" : "#94a3b8"
-      : p.type === "AA"
-      ? "#38bdf8"
-      : p.owner === "PLAYER"
-      ? "#22c55e"
-      : "#f87171";
-  ctx.fillStyle = color;
-  ctx.beginPath();
+const projectileColor = (p: Projectile): string =>
+  p.type === "TRANSPORT_POD"
+    ? "#fbbf24"
+    : p.type === "EMP"
+    ? "#22d3ee"
+    : p.type === "TUNNEL_BUSTER"
+    ? "#f59e0b"
+    : p.type === "DUMMY"
+    ? p.falseSignature
+      ? "#a855f7"
+      : "#94a3b8"
+    : p.type === "AA"
+    ? "#38bdf8"
+    : p.owner === "PLAYER"
+    ? "#ef4444"
+    : "#f59e0b";
+
+const drawOrientedProjectileBody = (
+  ctx: CanvasRenderingContext2D,
+  p: Projectile,
+  x: number,
+  y: number,
+  color: string
+) => {
+  const angle = Math.atan2(p.targetWY - p.startWY, p.targetWX - p.startWX);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+
   if (p.type === "TRANSPORT_POD") {
-    ctx.fillRect(cur.x - 5, cur.y - 8, 10, 16);
-    ctx.fillStyle = "#fde68a";
-    ctx.fillRect(cur.x - 3, cur.y - 6, 6, 4);
-  } else {
-    ctx.arc(cur.x, cur.y, 4, 0, Math.PI * 2);
+    const pod = ctx.createLinearGradient(-9, -13, 10, 15);
+    pod.addColorStop(0, "#fde68a");
+    pod.addColorStop(0.42, color);
+    pod.addColorStop(1, "#7c2d12");
+    ctx.fillStyle = pod;
+    ctx.beginPath();
+    ctx.moveTo(13, 0);
+    ctx.lineTo(5, -10);
+    ctx.lineTo(-12, -7);
+    ctx.lineTo(-12, 7);
+    ctx.lineTo(5, 10);
+    ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = `${color}99`;
+    ctx.strokeStyle = "rgba(2,6,23,0.72)";
+    ctx.stroke();
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(-8, -4, 9, 8);
+  } else if (p.type === "EMP") {
+    ctx.fillStyle = "rgba(34,211,238,0.22)";
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cur.x, cur.y, 7, 0, Math.PI * 2);
+    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-12, 2);
+    ctx.lineTo(-3, -5);
+    ctx.lineTo(3, 5);
+    ctx.lineTo(12, -3);
+    ctx.stroke();
+  } else {
+    const body = ctx.createLinearGradient(-13, -5, 14, 5);
+    body.addColorStop(0, "#0f172a");
+    body.addColorStop(0.48, color);
+    body.addColorStop(1, "#f8fafc");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.moveTo(15, 0);
+    ctx.lineTo(3, -5);
+    ctx.lineTo(-13, -4);
+    ctx.lineTo(-9, 0);
+    ctx.lineTo(-13, 4);
+    ctx.lineTo(3, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(2,6,23,0.7)";
+    ctx.stroke();
+    if (p.type === "DUMMY") {
+      ctx.strokeStyle = "rgba(216,180,254,0.9)";
+      ctx.setLineDash([3, 3]);
+      ctx.strokeRect(-9, -7, 16, 14);
+      ctx.setLineDash([]);
+    }
+  }
+
+  ctx.restore();
+};
+
+const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
+  const cur = projectileCurrentPos(p);
+  const color = projectileColor(p);
+
+  // Smoke trail
+  for (let i = 0; i < 12; i++) {
+    const tt = Math.max(0, p.progress - i * 0.025);
+    const trail = projectileCurrentPos({ ...p, progress: tt });
+    const drift = Math.sin(tt * Math.PI * 8 + i) * (i * 0.35);
+    const radius = 2 + i * 0.55;
+    const alpha = 0.11 * (1 - i / 12);
+    const smoke = ctx.createRadialGradient(trail.x + drift, trail.y, 1, trail.x + drift, trail.y, radius * 2.6);
+    smoke.addColorStop(0, `rgba(226,232,240,${alpha})`);
+    smoke.addColorStop(0.55, `rgba(100,116,139,${alpha * 0.55})`);
+    smoke.addColorStop(1, "rgba(15,23,42,0)");
+    ctx.fillStyle = smoke;
+    ctx.beginPath();
+    ctx.arc(trail.x + drift, trail.y, radius * 2.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.strokeStyle = `${color}66`;
+  ctx.lineWidth = p.type === "EMP" ? 2.5 : 1.5;
+  ctx.beginPath();
+  ctx.arc(cur.x, cur.y, p.type === "EMP" ? 17 : 10, 0, Math.PI * 2);
+  ctx.stroke();
+  drawOrientedProjectileBody(ctx, p, cur.x, cur.y, color);
+
+  if (p.type !== "TRANSPORT_POD") {
+    const angle = Math.atan2(p.targetWY - p.startWY, p.targetWX - p.startWX);
+    ctx.strokeStyle = `${color}88`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cur.x - Math.cos(angle) * 15, cur.y - Math.sin(angle) * 15);
+    ctx.lineTo(cur.x - Math.cos(angle) * 25, cur.y - Math.sin(angle) * 25);
     ctx.stroke();
   }
+  ctx.restore();
 };
 
 const drawProceduralMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
@@ -876,12 +965,37 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
 
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
   const lifeRatio = 1 - p.life / p.maxLife;
-  ctx.globalAlpha = Math.max(0, lifeRatio);
-  ctx.fillStyle = p.color;
+  const alpha = Math.max(0, lifeRatio);
+  const radius = Math.max(1, p.size * lifeRatio);
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+
+  const blast = ctx.createRadialGradient(p.pos.x, p.pos.y, 0, p.pos.x, p.pos.y, radius * 2.5);
+  blast.addColorStop(0, "rgba(255,255,255,0.85)");
+  blast.addColorStop(0.18, p.color);
+  blast.addColorStop(0.58, "rgba(249,115,22,0.42)");
+  blast.addColorStop(1, "rgba(15,23,42,0)");
+  ctx.fillStyle = blast;
   ctx.beginPath();
-  ctx.arc(p.pos.x, p.pos.y, p.size * lifeRatio, 0, Math.PI * 2);
+  ctx.arc(p.pos.x, p.pos.y, radius * 2.5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = `rgba(248,250,252,${0.28 * alpha})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(p.pos.x, p.pos.y, radius * 1.65, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(148,163,184,${0.18 * alpha})`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i++) {
+    const angle = i * 1.256 + p.maxLife * 0.37;
+    ctx.beginPath();
+    ctx.moveTo(p.pos.x + Math.cos(angle) * radius * 0.6, p.pos.y + Math.sin(angle) * radius * 0.6);
+    ctx.lineTo(p.pos.x + Math.cos(angle) * radius * 2.2, p.pos.y + Math.sin(angle) * radius * 2.2);
+    ctx.stroke();
+  }
+  ctx.restore();
 };
 
 const drawSeaBetween = (ctx: CanvasRenderingContext2D, t: number) => {
@@ -939,36 +1053,43 @@ const drawWeatherOverlay = (ctx: CanvasRenderingContext2D, state: RuntimeState, 
   if (fade <= 0) return;
   ctx.save();
   if (weather.type === "DUST_STORM") {
-    ctx.fillStyle = `rgba(180,83,9,${0.08 * fade})`;
+    const dust = ctx.createLinearGradient(0, 0, WORLD_W, ISLAND_PX_H);
+    dust.addColorStop(0, `rgba(120,53,15,${0.05 * fade})`);
+    dust.addColorStop(0.5, `rgba(251,191,36,${0.1 * fade})`);
+    dust.addColorStop(1, `rgba(67,20,7,${0.09 * fade})`);
+    ctx.fillStyle = dust;
     ctx.fillRect(0, 0, WORLD_W, ISLAND_PX_H);
-    ctx.strokeStyle = `rgba(251,191,36,${0.18 * fade})`;
     ctx.lineWidth = 1;
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 34; i++) {
       const y = ((i * 31 + t * 70) % ISLAND_PX_H);
+      ctx.strokeStyle = `rgba(251,191,36,${(0.08 + (i % 5) * 0.018) * fade})`;
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(WORLD_W, y - 42);
+      ctx.moveTo(-40, y);
+      ctx.lineTo(WORLD_W + 40, y - 42 - (i % 4) * 6);
       ctx.stroke();
     }
   } else if (weather.type === "FLOOD") {
-    ctx.fillStyle = `rgba(14,165,233,${0.07 * fade})`;
+    ctx.fillStyle = `rgba(14,165,233,${0.1 * fade})`;
     ctx.fillRect(0, 0, WORLD_W, ISLAND_PX_H);
-    ctx.strokeStyle = `rgba(125,211,252,${0.2 * fade})`;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       const y = ((i * 43 + t * 24) % ISLAND_PX_H);
+      ctx.strokeStyle = `rgba(125,211,252,${(0.14 + (i % 3) * 0.04) * fade})`;
+      ctx.lineWidth = i % 4 === 0 ? 2 : 1;
       ctx.beginPath();
       ctx.moveTo(0, y);
-      ctx.lineTo(WORLD_W, y + Math.sin(t + i) * 8);
+      ctx.bezierCurveTo(WORLD_W * 0.25, y + Math.sin(t + i) * 12, WORLD_W * 0.75, y - Math.cos(t + i) * 10, WORLD_W, y + Math.sin(t + i) * 8);
       ctx.stroke();
     }
   } else {
-    ctx.strokeStyle = `rgba(250,204,21,${0.18 * fade})`;
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 7; i++) {
+    ctx.fillStyle = `rgba(250,204,21,${0.025 * fade})`;
+    ctx.fillRect(0, 0, WORLD_W, ISLAND_PX_H);
+    for (let i = 0; i < 11; i++) {
       const x = ((i * 137 + t * 15) % WORLD_W);
+      ctx.strokeStyle = `rgba(250,204,21,${(0.12 + (i % 3) * 0.04) * fade})`;
+      ctx.lineWidth = i % 3 === 0 ? 3 : 1.5;
       ctx.beginPath();
       ctx.moveTo(x, 0);
-      ctx.lineTo(x + Math.sin(t * 6 + i) * 16, ISLAND_PX_H);
+      ctx.lineTo(x + Math.sin(t * 6 + i) * 24, ISLAND_PX_H);
       ctx.stroke();
     }
   }
@@ -995,22 +1116,38 @@ const drawPlacementGhost = (
       );
     ctx.strokeStyle = ok ? "#22c55e" : "#ef4444";
     ctx.lineWidth = 2;
-    ctx.strokeRect(px + 1, py + 1, TILE_PX - 2, TILE_PX - 2);
-    ctx.fillStyle = ok ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)";
-    ctx.fillRect(px + 1, py + 1, TILE_PX - 2, TILE_PX - 2);
+    ctx.setLineDash([7, 5]);
+    ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+    ctx.setLineDash([]);
+    ctx.fillStyle = ok ? "rgba(34,197,94,0.14)" : "rgba(239,68,68,0.16)";
+    ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
+    ctx.strokeStyle = ok ? "rgba(125,211,252,0.48)" : "rgba(248,113,113,0.52)";
+    for (let i = 0; i < 4; i++) {
+      const sy = py + 10 + i * 11;
+      ctx.beginPath();
+      ctx.moveTo(px + 9, sy);
+      ctx.lineTo(px + TILE_PX - 9, sy);
+      ctx.stroke();
+    }
   }
   if (state.selectedWeapon && hover.side === "ENEMY") {
     const px = islandOriginX("ENEMY") + hover.x * TILE_PX;
     const py = hover.y * TILE_PX;
     ctx.strokeStyle = "#f87171";
     ctx.lineWidth = 2;
-    ctx.strokeRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+    ctx.setLineDash([]);
     // crosshair
+    ctx.strokeStyle = "rgba(248,113,113,0.88)";
     ctx.beginPath();
     ctx.moveTo(px + TILE_PX / 2, py + 2);
     ctx.lineTo(px + TILE_PX / 2, py + TILE_PX - 2);
     ctx.moveTo(px + 2, py + TILE_PX / 2);
     ctx.lineTo(px + TILE_PX - 2, py + TILE_PX / 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(px + TILE_PX / 2, py + TILE_PX / 2, TILE_PX * 0.28, 0, Math.PI * 2);
     ctx.stroke();
   }
 };
