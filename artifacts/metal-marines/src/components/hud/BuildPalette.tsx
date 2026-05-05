@@ -3,6 +3,7 @@ import { formatCostPressure, getBuildingCost } from "@/game/economy";
 import type { BuildingType, ProjectileType, RuntimeState } from "@/game/types";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/utils";
+import { Crosshair, Hammer, Radio, Rocket, Shield, Skull, Zap } from "lucide-react";
 
 const buildOrder: BuildingType[] = [
   "ENERGY_PLANT",
@@ -24,6 +25,48 @@ const buildOrder: BuildingType[] = [
 
 const weaponOrder: ProjectileType[] = ["ICBM", "DUMMY", "AA", "TRANSPORT_POD", "EMP", "TUNNEL_BUSTER"];
 
+const buildCategory: Record<BuildingType, "BASE" | "INTEL" | "WEAPONS" | "ECOLOGY"> = {
+  HQ: "BASE",
+  ENERGY_PLANT: "BASE",
+  SUPPLY_DEPOT: "BASE",
+  RADAR: "INTEL",
+  RADAR_JAMMER: "INTEL",
+  TUNNEL_ENTRANCE: "INTEL",
+  SEISMIC_SENSOR: "INTEL",
+  TERRAIN_DESTABILIZER: "ECOLOGY",
+  WEATHER_CONTROL: "ECOLOGY",
+  BIOSPHERE_ENGINE: "ECOLOGY",
+  MISSILE_LAUNCHER: "WEAPONS",
+  EMP_CANNON: "WEAPONS",
+  METAL_MARINE_BASE: "WEAPONS",
+  AA_GUN: "WEAPONS",
+  GUN_TURRET: "WEAPONS",
+  LAND_MINE: "WEAPONS",
+};
+
+const categoryTone = {
+  BASE: "text-cyan-100 border-cyan-300/30 bg-cyan-500/10",
+  INTEL: "text-violet-100 border-violet-300/30 bg-violet-500/10",
+  WEAPONS: "text-red-100 border-red-300/30 bg-red-500/10",
+  ECOLOGY: "text-lime-100 border-lime-300/30 bg-lime-500/10",
+};
+
+const categoryIcon = {
+  BASE: Hammer,
+  INTEL: Radio,
+  WEAPONS: Shield,
+  ECOLOGY: Zap,
+};
+
+const shortName = (name: string) =>
+  name
+    .replace("Headquarters", "HQ")
+    .replace("Energy Plant", "Energy")
+    .replace("Supply Depot", "Depot")
+    .replace("Missile Silo", "Silo")
+    .replace("Radar Array", "Radar")
+    .replace("Metal Marine", "Marine");
+
 export default function BuildPalette({ state }: { state: RuntimeState }) {
   const selectBuild = useGame((s) => s.selectBuild);
   const selectWeapon = useGame((s) => s.selectWeapon);
@@ -39,50 +82,83 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
     (b) => b.side === "PLAYER" && b.type === "EMP_CANNON" && b.hp > 0 && b.buildTimeRemaining <= 0 && (b.disabledUntil ?? 0) <= state.elapsed
   );
 
+  const readyWeapons = weaponOrder.filter((t) => {
+    if (t === "TRANSPORT_POD") return hasMechBay;
+    if (t === "EMP") return hasEmp;
+    return hasLauncher;
+  }).length;
+
   return (
-    <div className="border-t border-primary/30 bg-black/60 font-mono">
-      <div className="grid grid-cols-2 gap-3 p-3">
-        {/* Build column */}
-        <div>
-          <div className="text-xs uppercase tracking-widest text-primary/80 mb-2">
-            CONSTRUCT
+    <div className="mm-panel border-x-0 border-b-0 font-mono">
+      <div className="grid grid-cols-[1.55fr_1fr] gap-3 p-3">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <div className="mm-panel-title text-[10px]">BUILD CONTROL</div>
+              <div className="text-sm font-black tracking-wide text-slate-100">BASE / DEFENSES / SYSTEMS</div>
+            </div>
+            <div className="flex gap-1 text-[9px] uppercase tracking-wider text-slate-400">
+              {(["BASE", "INTEL", "WEAPONS", "ECOLOGY"] as const).map((cat) => {
+                const Icon = categoryIcon[cat];
+                return (
+                  <span key={cat} className={`mm-corner-cut flex items-center gap-1 border px-2 py-1 ${categoryTone[cat]}`}>
+                    <Icon className="h-3 w-3" /> {cat}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-          <div className="grid grid-cols-6 gap-1.5">
+          <div className="grid grid-cols-5 gap-2 xl:grid-cols-8">
             {buildOrder.map((t) => {
               const spec = BUILDINGS[t];
               const cost = getBuildingCost(state.buildings, "PLAYER", t);
               const sel = state.selectedBuild === t;
               const ok = canAfford(cost.funds, cost.energy);
+              const cat = buildCategory[t];
+              const Icon = categoryIcon[cat];
               return (
                 <button
                   key={t}
                   onClick={() => selectBuild(sel ? null : t)}
                   className={cn(
-                    "relative h-16 rounded border text-[10px] leading-tight px-1 transition-all flex flex-col items-center justify-center gap-0.5",
+                    "mm-corner-cut mm-hud-button relative min-h-[74px] overflow-hidden border p-1.5 text-left transition-all",
                     sel
-                      ? "border-primary bg-primary/20 text-primary shadow-[0_0_10px_rgba(34,197,94,0.5)]"
+                      ? "border-cyan-200 bg-cyan-400/15 text-cyan-50 shadow-[0_0_18px_rgba(55,216,255,0.34)]"
                       : ok
-                      ? "border-primary/30 hover:border-primary/70 hover:bg-primary/10 text-foreground"
-                      : "border-border bg-muted/20 text-muted-foreground/60"
+                      ? "border-slate-500/35 text-slate-100 hover:border-cyan-300/60"
+                      : "border-slate-700/40 bg-black/30 text-slate-500 grayscale"
                   )}
                   title={formatCostPressure(state.buildings, "PLAYER", t)}
                 >
-                  <span className="text-[14px] leading-none font-bold">{spec.hotkey}</span>
-                  <span className="truncate w-full text-center">{spec.name.split(" ")[0]}</span>
-                  <span className="text-[9px] text-yellow-300/80">
-                    ${cost.funds}{cost.energy ? ` / ${cost.energy}E` : ""}
-                  </span>
+                  <div className="absolute right-1 top-1 rounded-sm border border-white/10 bg-black/35 px-1 text-[9px] font-black text-slate-200">
+                    {spec.hotkey}
+                  </div>
+                  <div className="mb-1 grid h-8 w-10 place-items-center border border-white/10 bg-black/30">
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="truncate text-[10px] font-bold uppercase leading-tight">{shortName(spec.name)}</div>
+                  <div className="mt-0.5 flex items-center gap-1 text-[9px] text-amber-200/90">
+                    <span>${cost.funds}</span>
+                    {cost.energy ? <span className="text-cyan-200/85">{cost.energy}E</span> : null}
+                  </div>
+                  <div className={`absolute bottom-0 left-0 h-0.5 ${sel ? "w-full bg-cyan-200" : ok ? "w-2/3 bg-slate-500" : "w-1/3 bg-slate-700"}`} />
                 </button>
               );
             })}
           </div>
         </div>
-        {/* Weapons column */}
-        <div>
-          <div className="text-xs uppercase tracking-widest text-destructive/80 mb-2">
-            WEAPONS
+
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <div className="mm-panel-title text-[10px] text-red-100/80">STRIKE DOCTRINES</div>
+              <div className="text-sm font-black tracking-wide text-red-100">LAUNCH CONTROL</div>
+            </div>
+            <div className="mm-corner-cut border border-red-300/30 bg-red-500/10 px-2 py-1 text-[10px] uppercase tracking-widest text-red-100">
+              {readyWeapons}/{weaponOrder.length} armed
+            </div>
           </div>
-          <div className="grid grid-cols-6 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {weaponOrder.map((t) => {
               const cost = WEAPON_COSTS[t];
               const lbl = WEAPON_LABELS[t];
@@ -94,27 +170,32 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                   key={t}
                   onClick={() => selectWeapon(sel ? null : t)}
                   className={cn(
-                    "relative h-16 rounded border text-[10px] leading-tight px-1 transition-all flex flex-col items-center justify-center gap-0.5",
+                    "mm-corner-cut mm-hud-button relative min-h-[74px] overflow-hidden border p-2 text-left transition-all",
                     sel
-                      ? "border-destructive bg-destructive/20 text-destructive shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                      ? "border-red-200 bg-red-400/15 text-red-50 shadow-[0_0_18px_rgba(239,68,68,0.34)]"
                       : ok
-                      ? "border-destructive/30 hover:border-destructive/70 hover:bg-destructive/10 text-foreground"
-                      : "border-border bg-muted/20 text-muted-foreground/60"
+                      ? "border-red-300/35 text-slate-100 hover:border-red-200/70"
+                      : "border-slate-700/40 bg-black/30 text-slate-500 grayscale"
                   )}
                   title={lbl.desc + (needs ? "" : " (Requires launcher)")}
                 >
-                  <span className="text-[14px] leading-none font-bold">{lbl.hotkey}</span>
-                  <span className="truncate w-full text-center">{lbl.name}</span>
-                  <span className="text-[9px] text-yellow-300/80">
-                    ${cost.funds} / {cost.energy}E
-                  </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="grid h-8 w-10 place-items-center border border-white/10 bg-black/30 text-red-100">
+                      {t === "AA" ? <Crosshair className="h-4 w-4" /> : t === "EMP" ? <Zap className="h-4 w-4" /> : t === "TUNNEL_BUSTER" ? <Skull className="h-4 w-4" /> : <Rocket className="h-4 w-4" />}
+                    </div>
+                    <div className="rounded-sm border border-white/10 bg-black/35 px-1 text-[9px] font-black text-slate-200">{lbl.hotkey}</div>
+                  </div>
+                  <div className="mt-1 truncate text-[10px] font-bold uppercase leading-tight">{lbl.name}</div>
+                  <div className="mt-0.5 text-[9px] text-amber-200/90">${cost.funds} <span className="text-cyan-200/85">{cost.energy}E</span></div>
+                  {!needs && <div className="mt-0.5 text-[8px] uppercase text-slate-500">Requires asset</div>}
+                  <div className={`absolute bottom-0 left-0 h-0.5 ${sel ? "w-full bg-red-200" : ok ? "w-2/3 bg-red-500" : "w-1/3 bg-slate-700"}`} />
                 </button>
               );
             })}
           </div>
         </div>
       </div>
-      <div className="px-3 pb-2 text-[10px] text-muted-foreground/70 flex justify-between border-t border-primary/10 pt-1">
+      <div className="flex justify-between border-t border-white/5 px-3 pb-2 pt-1 text-[10px] uppercase tracking-wider text-slate-500">
         <span>
           Click LEFT island to BUILD. Click RIGHT island to FIRE. Right-click or ESC to cancel.
         </span>

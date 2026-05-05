@@ -1,13 +1,12 @@
 import type { RuntimeState } from "@/game/types";
 import { projectileCurrentPos } from "@/game/engine";
 import { GRID_H, GRID_W, ISLAND_PX_W, TILE_PX } from "@/game/constants";
-import { Radar } from "lucide-react";
+import { Radar, RadioTower, TriangleAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
 
-const PANEL_W = 168;
-const PANEL_H = 110;
-const MAP_W = 152;
-const MAP_H = 70;
+const PANEL_W = 210;
+const MAP_W = 186;
+const MAP_H = 86;
 
 export default function RadarPanel({ state }: { state: RuntimeState }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,7 +31,7 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
     // Background
     ctx.fillStyle = "#020617";
     ctx.fillRect(0, 0, MAP_W, MAP_H);
-    ctx.strokeStyle = "rgba(34,197,94,0.45)";
+    ctx.strokeStyle = "rgba(125,211,252,0.42)";
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, MAP_W - 1, MAP_H - 1);
 
@@ -69,7 +68,7 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
       if (b.side !== "PLAYER" || b.hp <= 0) continue;
       const px = (b.pos.x + 0.5) * tw;
       const py = (b.pos.y + 0.5) * th;
-      ctx.fillStyle = b.type === "HQ" ? "#22c55e" : "rgba(34,197,94,0.7)";
+      ctx.fillStyle = b.type === "HQ" ? "#f87171" : "rgba(248,113,113,0.72)";
       ctx.beginPath();
       ctx.arc(px, py, b.type === "HQ" ? 3 : 1.6, 0, Math.PI * 2);
       ctx.fill();
@@ -136,30 +135,38 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
 
   void ISLAND_PX_W;
 
+  const status = state.weatherActive
+    ? "ECO"
+    : state.viewLayer === "UNDERGROUND"
+    ? "SEISMIC"
+    : hasRadar
+    ? jammerActive
+      ? "JAMMED"
+      : "ONLINE"
+    : "OFFLINE";
+
   return (
     <div className="absolute top-2 right-2 z-20 font-mono pointer-events-none select-none">
       <div
-        className="bg-background/85 border border-primary/50 rounded shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+        className="mm-panel mm-corner-cut border-cyan-300/35 shadow-[0_0_22px_rgba(55,216,255,0.18)]"
         style={{ width: PANEL_W }}
       >
-        <div className="flex items-center justify-between px-2 py-1 border-b border-primary/30 text-[10px] uppercase tracking-widest text-primary">
-          <span className="flex items-center gap-1">
-            <Radar className="w-3 h-3" /> RADAR
+        <div className="flex items-center justify-between border-b border-cyan-300/15 px-3 py-2 text-[10px] uppercase tracking-[0.18em]">
+          <span className="mm-panel-title flex items-center gap-1.5 text-cyan-100">
+            <Radar className="h-3.5 w-3.5" /> TACTICAL RADAR
           </span>
           <span
             className={
-              hasRadar ? "text-primary" : "text-muted-foreground/70"
+              hasRadar ? "text-cyan-100" : "text-slate-500"
             }
           >
-            {state.weatherActive ? "ECO" : state.viewLayer === "UNDERGROUND" ? "SEISMIC" : hasRadar ? (jammerActive ? "JAMMED" : "ONLINE") : "OFFLINE"}
+            {status}
           </span>
         </div>
-        <div className="p-2 flex flex-col gap-1.5">
+        <div className="flex flex-col gap-2 p-3">
           <div
-            className="relative"
+            className="relative border border-cyan-300/25 bg-black/60 p-1 shadow-inner"
             style={{
-              width: MAP_W,
-              height: MAP_H,
               filter: hasRadar ? "none" : "grayscale(1) brightness(0.4)",
             }}
           >
@@ -167,21 +174,24 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
               ref={canvasRef}
               width={MAP_W}
               height={MAP_H}
-              className="block w-full h-full"
+              className="block w-full"
               style={{ imageRendering: "pixelated" }}
             />
+            <div className="pointer-events-none absolute inset-1 border border-cyan-100/10" />
+            <div className="pointer-events-none absolute left-1 top-1 h-[calc(100%-0.5rem)] w-full bg-gradient-to-b from-cyan-300/0 via-cyan-300/10 to-cyan-300/0 opacity-45" />
             {!hasRadar && (
-              <div className="absolute inset-0 flex items-center justify-center text-[9px] text-muted-foreground uppercase">
+              <div className="absolute inset-0 flex items-center justify-center text-[9px] uppercase tracking-widest text-slate-400">
                 Build Radar
               </div>
             )}
           </div>
-          <div className="text-[10px] text-destructive uppercase tracking-wider min-h-[14px]">
+          <div className="min-h-[16px] text-[10px] uppercase tracking-wider text-red-100">
             {hasRadar ? (
               threats.length === 0 ? (
-                <span className="text-primary/70">No inbound</span>
+                <span className="flex items-center gap-1 text-cyan-100/75"><RadioTower className="h-3 w-3" /> No inbound</span>
               ) : (
-                <span>
+                <span className="flex items-center gap-1">
+                  <TriangleAlert className="h-3 w-3 text-red-200" />
                   {threats.length} INBOUND ::{" "}
                   {threats
                     .map((t) => `${t.type === "TRANSPORT_POD" ? "POD" : t.type}/${t.eta.toFixed(1)}s`)
@@ -189,7 +199,7 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
                 </span>
               )
             ) : (
-              <span className="text-muted-foreground/70">Threat data offline</span>
+              <span className="text-slate-500">Threat data offline</span>
             )}
           </div>
         </div>
