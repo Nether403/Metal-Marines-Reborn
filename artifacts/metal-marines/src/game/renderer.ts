@@ -21,28 +21,304 @@ import type {
 import { islandOriginX, projectileCurrentPos, tileToWorld } from "./engine";
 import { spriteManager } from "./sprites";
 
-const TERRAIN_FILL: Record<string, string> = {
-  GRASS: "#0e3b2c",
-  FOREST: "#0a2d20",
-  MOUNTAIN: "#1f2937",
-  WATER: "#0a1933",
-  TOXIC_SLUDGE: "#3f6212",
-};
-
-const TERRAIN_ACCENT: Record<string, string> = {
-  GRASS: "#155e3a",
-  FOREST: "#14532d",
-  MOUNTAIN: "#374151",
-  WATER: "#1e3a5f",
-  TOXIC_SLUDGE: "#a3e635",
-};
-
 const terrainSpriteKey: Record<string, string> = {
   GRASS: "terrain.grass.base",
   FOREST: "terrain.forest.base",
   MOUNTAIN: "terrain.mountain.base",
   WATER: "terrain.water.base",
   TOXIC_SLUDGE: "terrain.toxic_sludge.base",
+};
+
+type TerrainKey = Tile["terrain"];
+
+const TERRAIN_PALETTE: Record<
+  TerrainKey,
+  { base: string; mid: string; accent: string; shadow: string; line: string }
+> = {
+  GRASS: {
+    base: "#0d3528",
+    mid: "#14543a",
+    accent: "#2dd06d",
+    shadow: "#061d16",
+    line: "rgba(74,222,128,0.16)",
+  },
+  FOREST: {
+    base: "#08261c",
+    mid: "#10482b",
+    accent: "#22c55e",
+    shadow: "#03150f",
+    line: "rgba(34,197,94,0.18)",
+  },
+  MOUNTAIN: {
+    base: "#17202c",
+    mid: "#334155",
+    accent: "#94a3b8",
+    shadow: "#070b12",
+    line: "rgba(203,213,225,0.12)",
+  },
+  WATER: {
+    base: "#06142d",
+    mid: "#0b3b68",
+    accent: "#38bdf8",
+    shadow: "#020817",
+    line: "rgba(125,211,252,0.2)",
+  },
+  TOXIC_SLUDGE: {
+    base: "#253806",
+    mid: "#4d7c0f",
+    accent: "#bef264",
+    shadow: "#111904",
+    line: "rgba(217,249,157,0.24)",
+  },
+};
+
+const terrainHash = (x: number, y: number, salt = 0) => {
+  const n = Math.sin((x + 1) * 127.1 + (y + 1) * 311.7 + salt * 74.7) * 43758.5453;
+  return n - Math.floor(n);
+};
+
+const isLandTerrain = (terrain: TerrainKey | null | undefined) =>
+  !!terrain && terrain !== "WATER";
+
+const terrainAt = (tiles: Tile[], x: number, y: number): TerrainKey | null => {
+  if (x < 0 || y < 0 || x >= GRID_W || y >= GRID_H) return null;
+  return tiles[y * GRID_W + x]?.terrain ?? null;
+};
+
+const drawTileGradient = (
+  ctx: CanvasRenderingContext2D,
+  terrain: TerrainKey,
+  px: number,
+  py: number,
+  x: number,
+  y: number
+) => {
+  const palette = TERRAIN_PALETTE[terrain];
+  const shift = terrainHash(x, y, 3);
+  const gradient = ctx.createLinearGradient(px, py, px + TILE_PX, py + TILE_PX);
+  gradient.addColorStop(0, palette.mid);
+  gradient.addColorStop(0.45 + shift * 0.15, palette.base);
+  gradient.addColorStop(1, palette.shadow);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(px, py, TILE_PX, TILE_PX);
+};
+
+const drawGrassDetails = (ctx: CanvasRenderingContext2D, px: number, py: number, x: number, y: number) => {
+  for (let i = 0; i < 9; i++) {
+    const n = terrainHash(x, y, i);
+    const gx = px + 8 + ((n * 97 + i * 13) % (TILE_PX - 16));
+    const gy = py + 9 + ((n * 53 + i * 17) % (TILE_PX - 18));
+    ctx.strokeStyle = i % 3 === 0 ? "rgba(74,222,128,0.28)" : "rgba(20,83,45,0.42)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy + 4);
+    ctx.lineTo(gx + 3, gy);
+    ctx.lineTo(gx + 7, gy + 5);
+    ctx.stroke();
+  }
+};
+
+const drawForestDetails = (ctx: CanvasRenderingContext2D, px: number, py: number, x: number, y: number) => {
+  const canopy = [
+    [0.26, 0.3, 10],
+    [0.54, 0.25, 12],
+    [0.74, 0.48, 10],
+    [0.38, 0.62, 13],
+    [0.62, 0.76, 9],
+  ] as const;
+  for (const [rx, ry, r] of canopy) {
+    const jitter = terrainHash(x, y, rx + ry);
+    const cx = px + TILE_PX * rx + (jitter - 0.5) * 5;
+    const cy = py + TILE_PX * ry + (jitter - 0.5) * 4;
+    const grad = ctx.createRadialGradient(cx - 3, cy - 4, 2, cx, cy, r);
+    grad.addColorStop(0, "#34d399");
+    grad.addColorStop(0.55, "#166534");
+    grad.addColorStop(1, "#052e1d");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "rgba(3,7,18,0.24)";
+  ctx.fillRect(px + 6, py + TILE_PX - 8, TILE_PX - 12, 3);
+};
+
+const drawMountainDetails = (ctx: CanvasRenderingContext2D, px: number, py: number, x: number, y: number) => {
+  const peak = terrainHash(x, y, 11) * 8 - 4;
+  ctx.fillStyle = "#273449";
+  ctx.beginPath();
+  ctx.moveTo(px + 6, py + TILE_PX - 8);
+  ctx.lineTo(px + TILE_PX * 0.44 + peak, py + 10);
+  ctx.lineTo(px + TILE_PX - 7, py + TILE_PX - 7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#475569";
+  ctx.beginPath();
+  ctx.moveTo(px + TILE_PX * 0.44 + peak, py + 10);
+  ctx.lineTo(px + TILE_PX * 0.58, py + TILE_PX - 8);
+  ctx.lineTo(px + TILE_PX - 7, py + TILE_PX - 7);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(226,232,240,0.75)";
+  ctx.beginPath();
+  ctx.moveTo(px + TILE_PX * 0.44 + peak, py + 10);
+  ctx.lineTo(px + TILE_PX * 0.36 + peak, py + 25);
+  ctx.lineTo(px + TILE_PX * 0.52 + peak, py + 23);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(2,6,23,0.36)";
+  ctx.beginPath();
+  ctx.moveTo(px + TILE_PX * 0.35, py + TILE_PX * 0.5);
+  ctx.lineTo(px + TILE_PX * 0.52, py + TILE_PX - 10);
+  ctx.moveTo(px + TILE_PX * 0.57, py + TILE_PX * 0.35);
+  ctx.lineTo(px + TILE_PX * 0.76, py + TILE_PX - 11);
+  ctx.stroke();
+};
+
+const drawWaterDetails = (
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  x: number,
+  y: number,
+  t: number
+) => {
+  for (let i = 0; i < 4; i++) {
+    const yy = py + 12 + i * 12 + Math.sin(t * 1.7 + x * 0.7 + y + i) * 2;
+    const offset = Math.sin(t * 1.3 + i + x) * 4;
+    ctx.strokeStyle = `rgba(125,211,252,${0.12 + i * 0.025})`;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(px + 7 + offset, yy);
+    ctx.bezierCurveTo(px + 21 + offset, yy - 5, px + 38 + offset, yy + 5, px + TILE_PX - 7, yy - 1);
+    ctx.stroke();
+  }
+};
+
+const drawToxicDetails = (
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  x: number,
+  y: number,
+  t: number
+) => {
+  for (let i = 0; i < 3; i++) {
+    const n = terrainHash(x, y, i + 21);
+    const cx = px + TILE_PX * (0.25 + n * 0.5);
+    const cy = py + TILE_PX * (0.25 + terrainHash(x, y, i + 34) * 0.5);
+    const r = 7 + n * 8 + Math.sin(t * 3 + i + x) * 1.5;
+    ctx.fillStyle = `rgba(190,242,100,${0.12 + i * 0.05})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r, r * 0.62, Math.sin(n * 10), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = "rgba(217,249,157,0.34)";
+  ctx.beginPath();
+  ctx.moveTo(px + 9, py + 38);
+  ctx.bezierCurveTo(px + 19, py + 23, px + 34, py + 45, px + 52, py + 22);
+  ctx.stroke();
+};
+
+const drawTerrainFallback = (
+  ctx: CanvasRenderingContext2D,
+  tile: Tile,
+  px: number,
+  py: number,
+  x: number,
+  y: number,
+  t: number
+) => {
+  drawTileGradient(ctx, tile.terrain, px, py, x, y);
+  if (tile.terrain === "GRASS") drawGrassDetails(ctx, px, py, x, y);
+  else if (tile.terrain === "FOREST") drawForestDetails(ctx, px, py, x, y);
+  else if (tile.terrain === "MOUNTAIN") drawMountainDetails(ctx, px, py, x, y);
+  else if (tile.terrain === "WATER") drawWaterDetails(ctx, px, py, x, y, t);
+  else if (tile.terrain === "TOXIC_SLUDGE") drawToxicDetails(ctx, px, py, x, y, t);
+};
+
+const drawEdgeLine = (
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  edge: "top" | "right" | "bottom" | "left",
+  color: string,
+  width: number
+) => {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  if (edge === "top") {
+    ctx.moveTo(px + 3, py + 3);
+    ctx.lineTo(px + TILE_PX - 3, py + 3);
+  } else if (edge === "right") {
+    ctx.moveTo(px + TILE_PX - 3, py + 3);
+    ctx.lineTo(px + TILE_PX - 3, py + TILE_PX - 3);
+  } else if (edge === "bottom") {
+    ctx.moveTo(px + 3, py + TILE_PX - 3);
+    ctx.lineTo(px + TILE_PX - 3, py + TILE_PX - 3);
+  } else {
+    ctx.moveTo(px + 3, py + 3);
+    ctx.lineTo(px + 3, py + TILE_PX - 3);
+  }
+  ctx.stroke();
+};
+
+const drawTerrainTransitions = (
+  ctx: CanvasRenderingContext2D,
+  tiles: Tile[],
+  x: number,
+  y: number,
+  px: number,
+  py: number,
+  terrain: TerrainKey
+) => {
+  const edges = [
+    ["top", terrainAt(tiles, x, y - 1)],
+    ["right", terrainAt(tiles, x + 1, y)],
+    ["bottom", terrainAt(tiles, x, y + 1)],
+    ["left", terrainAt(tiles, x - 1, y)],
+  ] as const;
+
+  for (const [edge, neighbor] of edges) {
+    const waterBoundary = terrain === "WATER" ? isLandTerrain(neighbor) : neighbor === "WATER" || neighbor === null;
+    if (waterBoundary) {
+      drawEdgeLine(
+        ctx,
+        px,
+        py,
+        edge,
+        terrain === "WATER" ? "rgba(186,230,253,0.34)" : "rgba(250,204,21,0.28)",
+        terrain === "WATER" ? 2 : 4
+      );
+      continue;
+    }
+
+    if (neighbor && neighbor !== terrain) {
+      const color = terrain === "MOUNTAIN" || neighbor === "MOUNTAIN" ? "rgba(15,23,42,0.42)" : TERRAIN_PALETTE[terrain].line;
+      drawEdgeLine(ctx, px, py, edge, color, 1.5);
+    }
+  }
+};
+
+const drawIslandShadow = (ctx: CanvasRenderingContext2D, side: Owner) => {
+  const ox = islandOriginX(side);
+  const shadow = ctx.createRadialGradient(
+    ox + ISLAND_PX_W / 2,
+    ISLAND_PX_H / 2,
+    ISLAND_PX_W * 0.18,
+    ox + ISLAND_PX_W / 2,
+    ISLAND_PX_H / 2,
+    ISLAND_PX_W * 0.7
+  );
+  shadow.addColorStop(0, "rgba(2,6,23,0.08)");
+  shadow.addColorStop(0.72, "rgba(2,6,23,0.5)");
+  shadow.addColorStop(1, "rgba(2,6,23,0)");
+  ctx.fillStyle = shadow;
+  ctx.fillRect(ox - 40, -24, ISLAND_PX_W + 80, ISLAND_PX_H + 70);
 };
 
 const buildingSpriteKey = (b: Building, now: number): string => {
@@ -59,15 +335,6 @@ const buildingSpriteKey = (b: Building, now: number): string => {
   return `building.${type}.${owner}.${state}`;
 };
 
-const drawWaterShimmer = (ctx: CanvasRenderingContext2D, x: number, y: number, t: number) => {
-  ctx.strokeStyle = `rgba(56,189,248,${0.18 + 0.12 * Math.sin(t * 2 + x + y)})`;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x + 6, y + TILE_PX / 2);
-  ctx.lineTo(x + TILE_PX - 6, y + TILE_PX / 2);
-  ctx.stroke();
-};
-
 const drawIsland = (
   ctx: CanvasRenderingContext2D,
   side: Owner,
@@ -78,9 +345,15 @@ const drawIsland = (
   now: number
 ) => {
   const ox = islandOriginX(side);
-  // Backdrop
-  ctx.fillStyle = "#020617";
-  ctx.fillRect(ox - 4, -4, ISLAND_PX_W + 8, ISLAND_PX_H + 8);
+  drawIslandShadow(ctx, side);
+
+  // Backdrop / terrain bed
+  const bed = ctx.createLinearGradient(ox, 0, ox + ISLAND_PX_W, ISLAND_PX_H);
+  bed.addColorStop(0, "#07111f");
+  bed.addColorStop(0.55, side === "PLAYER" ? "#06241e" : "#1d1231");
+  bed.addColorStop(1, "#020617");
+  ctx.fillStyle = bed;
+  ctx.fillRect(ox - 8, -8, ISLAND_PX_W + 16, ISLAND_PX_H + 16);
 
   for (let y = 0; y < GRID_H; y++) {
     for (let x = 0; x < GRID_W; x++) {
@@ -91,52 +364,14 @@ const drawIsland = (
         scale: TILE_PX / 64,
       });
       if (!drewTerrain) {
-        ctx.fillStyle = TERRAIN_FILL[tile.terrain] ?? "#0e3b2c";
-        ctx.fillRect(px, py, TILE_PX, TILE_PX);
+        drawTerrainFallback(ctx, tile, px, py, x, y, t);
       }
+      drawTerrainTransitions(ctx, tiles, x, y, px, py, tile.terrain);
 
       // Tile outline
-      ctx.strokeStyle = "rgba(34,197,94,0.08)";
+      ctx.strokeStyle = tile.terrain === "WATER" ? "rgba(125,211,252,0.08)" : "rgba(34,197,94,0.055)";
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 0.5, py + 0.5, TILE_PX - 1, TILE_PX - 1);
-
-      if (tile.terrain === "FOREST") {
-        ctx.fillStyle = TERRAIN_ACCENT.FOREST;
-        for (let i = 0; i < 4; i++) {
-          const cx = px + 8 + (i % 2) * 18;
-          const cy = py + 8 + Math.floor(i / 2) * 18;
-          ctx.beginPath();
-          ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      } else if (tile.terrain === "MOUNTAIN") {
-        ctx.fillStyle = TERRAIN_ACCENT.MOUNTAIN;
-        ctx.beginPath();
-        ctx.moveTo(px + 6, py + TILE_PX - 6);
-        ctx.lineTo(px + TILE_PX / 2, py + 8);
-        ctx.lineTo(px + TILE_PX - 6, py + TILE_PX - 6);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.15)";
-        ctx.beginPath();
-        ctx.moveTo(px + TILE_PX / 2 - 4, py + 14);
-        ctx.lineTo(px + TILE_PX / 2, py + 8);
-        ctx.lineTo(px + TILE_PX / 2 + 4, py + 14);
-        ctx.closePath();
-        ctx.fill();
-      } else if (tile.terrain === "WATER") {
-        drawWaterShimmer(ctx, px, py, t);
-      } else if (tile.terrain === "TOXIC_SLUDGE") {
-        ctx.fillStyle = `rgba(190,242,100,${0.14 + 0.08 * Math.sin(t * 5 + x + y)})`;
-        ctx.beginPath();
-        ctx.arc(px + TILE_PX * 0.5, py + TILE_PX * 0.5, 11, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = "rgba(217,249,157,0.35)";
-        ctx.beginPath();
-        ctx.moveTo(px + 8, py + 28);
-        ctx.bezierCurveTo(px + 16, py + 14, px + 28, py + 34, px + 36, py + 18);
-        ctx.stroke();
-      }
 
       if (underground) {
         const tunnelOpen = tile.tunnel?.open;
@@ -161,13 +396,16 @@ const drawIsland = (
   }
 
   // Border
-  ctx.strokeStyle = side === "PLAYER" ? "rgba(34,197,94,0.6)" : "rgba(248,113,113,0.55)";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(ox + 0.5, 0.5, ISLAND_PX_W - 1, ISLAND_PX_H - 1);
+  ctx.strokeStyle = side === "PLAYER" ? "rgba(248,113,113,0.72)" : "rgba(216,180,254,0.58)";
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(ox + 1.5, 1.5, ISLAND_PX_W - 3, ISLAND_PX_H - 3);
+  ctx.strokeStyle = "rgba(125,211,252,0.16)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ox + 7.5, 7.5, ISLAND_PX_W - 15, ISLAND_PX_H - 15);
 
   // Side label
   ctx.font = "11px 'Space Mono', ui-monospace, monospace";
-  ctx.fillStyle = side === "PLAYER" ? "rgba(34,197,94,0.85)" : "rgba(248,113,113,0.85)";
+  ctx.fillStyle = side === "PLAYER" ? "rgba(248,113,113,0.92)" : "rgba(250,204,21,0.86)";
   ctx.fillText(side === "PLAYER" ? "AO :: HOME ISLAND" : "AO :: HOSTILE ISLAND", ox + 8, ISLAND_PX_H + 16);
 
   // Fog
@@ -385,13 +623,42 @@ const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
 
 const drawSeaBetween = (ctx: CanvasRenderingContext2D, t: number) => {
   const x = ISLAND_PX_W;
-  ctx.fillStyle = "#020617";
+  const sea = ctx.createLinearGradient(x, 0, x + SKY_GAP_PX, ISLAND_PX_H);
+  sea.addColorStop(0, "#020617");
+  sea.addColorStop(0.22, "#062040");
+  sea.addColorStop(0.52, "#082f55");
+  sea.addColorStop(0.82, "#07162c");
+  sea.addColorStop(1, "#020617");
+  ctx.fillStyle = sea;
   ctx.fillRect(x, 0, SKY_GAP_PX, ISLAND_PX_H);
-  // Animated horizon
-  for (let i = 0; i < 30; i++) {
-    const yy = (i * 17 + ((t * 30) % 30)) % ISLAND_PX_H;
-    ctx.fillStyle = `rgba(56,189,248,${0.04 + 0.04 * Math.sin(t + i)})`;
-    ctx.fillRect(x + 5 + ((i * 13) % (SKY_GAP_PX - 10)), yy, 2, 2);
+
+  ctx.fillStyle = "rgba(2,6,23,0.28)";
+  ctx.fillRect(x, 0, 10, ISLAND_PX_H);
+  ctx.fillRect(x + SKY_GAP_PX - 10, 0, 10, ISLAND_PX_H);
+
+  for (let i = 0; i < 18; i++) {
+    const yy = (i * 39 + ((t * 18) % 39)) % ISLAND_PX_H;
+    const waveW = 36 + (i % 5) * 12;
+    const waveX = x + 14 + ((i * 29 + t * 10) % Math.max(1, SKY_GAP_PX - waveW - 28));
+    ctx.strokeStyle = `rgba(125,211,252,${0.08 + 0.04 * Math.sin(t * 1.4 + i)})`;
+    ctx.lineWidth = i % 3 === 0 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(waveX, yy);
+    ctx.bezierCurveTo(waveX + waveW * 0.3, yy - 7, waveX + waveW * 0.66, yy + 7, waveX + waveW, yy - 2);
+    ctx.stroke();
+  }
+
+  const haze = ctx.createLinearGradient(0, 0, 0, ISLAND_PX_H);
+  haze.addColorStop(0, "rgba(186,230,253,0.08)");
+  haze.addColorStop(0.45, "rgba(14,165,233,0)");
+  haze.addColorStop(1, "rgba(2,6,23,0.32)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(x, 0, SKY_GAP_PX, ISLAND_PX_H);
+
+  for (let i = 0; i < 24; i++) {
+    const yy = (i * 23 + ((t * 28) % 46)) % ISLAND_PX_H;
+    ctx.fillStyle = `rgba(56,189,248,${0.035 + 0.035 * Math.sin(t + i)})`;
+    ctx.fillRect(x + 7 + ((i * 17) % Math.max(1, SKY_GAP_PX - 14)), yy, 2, 2);
   }
   ctx.font = "10px 'Space Mono', monospace";
   ctx.fillStyle = "rgba(56,189,248,0.45)";
