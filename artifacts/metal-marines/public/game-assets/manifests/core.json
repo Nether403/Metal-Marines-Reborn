@@ -1,5 +1,63 @@
 {
-  "atlases": {},
-  "sprites": {},
-  "animations": {}
+  "atlases": {
+    "terrain":          "/game-assets/terrain.png",
+    "buildings-player": "/game-assets/buildings-player.png",
+    "buildings-enemy":  "/game-assets/buildings-enemy.png",
+    "units":            "/game-assets/units.png",
+    "projectiles":      "/game-assets/projectiles.png",
+    "ui":               "/game-assets/ui.png"
+  },
+  "sprites": {
+    "terrain.grass.base":       { "atlas": "terrain", "x": 0,   "y": 0,   "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.5 },
+    "terrain.forest.base":      { "atlas": "terrain", "x": 64,  "y": 0,   "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.5 },
+    "terrain.mountain.base":    { "atlas": "terrain", "x": 128, "y": 0,   "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.5 },
+    "terrain.water.base":       { "atlas": "terrain", "x": 192, "y": 0,   "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.5 },
+    "terrain.toxic_sludge.base":{ "atlas": "terrain", "x": 256, "y": 0,   "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.5 },
+
+    "building.hq.player.idle":         { "atlas": "buildings-player", "x": 0,   "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.hq.player.damaged":      { "atlas": "buildings-player", "x": 64,  "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.hq.player.construction": { "atlas": "buildings-player", "x": 128, "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.hq.player.disabled":     { "atlas": "buildings-player", "x": 192, "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+
+    "building.missile_launcher.player.idle":         { "atlas": "buildings-player", "x": 0,   "y": 80,  "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.missile_launcher.player.damaged":      { "atlas": "buildings-player", "x": 64,  "y": 80,  "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.missile_launcher.player.construction": { "atlas": "buildings-player", "x": 128, "y": 80,  "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.missile_launcher.player.disabled":     { "atlas": "buildings-player", "x": 192, "y": 80,  "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+
+    "building.energy_plant.player.idle":         { "atlas": "buildings-player", "x": 0,   "y": 144, "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.energy_plant.player.damaged":      { "atlas": "buildings-player", "x": 64,  "y": 144, "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.energy_plant.player.construction": { "atlas": "buildings-player", "x": 128, "y": 144, "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.energy_plant.player.disabled":     { "atlas": "buildings-player", "x": 192, "y": 144, "w": 64, "h": 64, "anchorX": 0.5, "anchorY": 0.75 },
+
+    "building.hq.enemy.idle":         { "atlas": "buildings-enemy", "x": 0,   "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.hq.enemy.damaged":      { "atlas": "buildings-enemy", "x": 64,  "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.hq.enemy.construction": { "atlas": "buildings-enemy", "x": 128, "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+    "building.hq.enemy.disabled":     { "atlas": "buildings-enemy", "x": 192, "y": 0,   "w": 64, "h": 80, "anchorX": 0.5, "anchorY": 0.75 },
+
+    "unit.mech.player.idle":     { "atlas": "units", "x": 0,   "y": 0,  "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.player.walking":  { "atlas": "units", "x": 40,  "y": 0,  "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.player.fighting": { "atlas": "units", "x": 80,  "y": 0,  "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.player.boarding": { "atlas": "units", "x": 120, "y": 0,  "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.player.dead":     { "atlas": "units", "x": 160, "y": 0,  "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+
+    "unit.mech.enemy.idle":      { "atlas": "units", "x": 0,   "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.enemy.walking":   { "atlas": "units", "x": 40,  "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.enemy.fighting":  { "atlas": "units", "x": 80,  "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.enemy.boarding":  { "atlas": "units", "x": 120, "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+    "unit.mech.enemy.dead":      { "atlas": "units", "x": 160, "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
+
+    "projectile.icbm":          { "atlas": "projectiles", "x": 0,  "y": 0,  "w": 24, "h": 48 },
+    "projectile.emp":           { "atlas": "projectiles", "x": 24, "y": 0,  "w": 32, "h": 32 },
+    "projectile.transport_pod": { "atlas": "projectiles", "x": 56, "y": 0,  "w": 32, "h": 24 },
+    "projectile.tunnel_buster": { "atlas": "projectiles", "x": 88, "y": 0,  "w": 24, "h": 40 },
+    "projectile.dummy":         { "atlas": "projectiles", "x": 112,"y": 0,  "w": 20, "h": 36 },
+    "projectile.aa":            { "atlas": "projectiles", "x": 132,"y": 0,  "w": 16, "h": 28 }
+  },
+  "animations": {
+    "unit.mech.player.walking":  { "frames": ["unit.mech.player.walking"],  "frameMs": 120, "loop": true  },
+    "unit.mech.player.fighting": { "frames": ["unit.mech.player.fighting"], "frameMs": 80,  "loop": true  },
+    "unit.mech.enemy.walking":   { "frames": ["unit.mech.enemy.walking"],   "frameMs": 120, "loop": true  },
+    "unit.mech.enemy.fighting":  { "frames": ["unit.mech.enemy.fighting"],  "frameMs": 80,  "loop": true  }
+  }
 }
+
