@@ -185,8 +185,17 @@ export class SpriteManager {
 }
 
 const joinAssetPath = (basePath: string, src: string): string => {
-  if (/^(https?:)?\/\//.test(src) || src.startsWith("/")) return src;
+  if (/^(https?:)?\/\//.test(src)) return src;
+  if (src.startsWith("/")) {
+    const root = basePath.replace(/\/$/, "");
+    return `${root}${src}`;
+  }
   return `${basePath}${src}`;
+};
+
+const assetBasePath = (): string => {
+  const base = import.meta.env.BASE_URL ?? "/";
+  return base.endsWith("/") ? base.slice(0, -1) : base;
 };
 
 export const spriteManager = new SpriteManager();
@@ -195,7 +204,11 @@ let defaultManifestLoad: Promise<void> | null = null;
 
 export const preloadGameSprites = (): Promise<void> => {
   if (!defaultManifestLoad) {
-    defaultManifestLoad = spriteManager.loadManifest("/game-assets/manifests/core.json");
+    const base = assetBasePath();
+    defaultManifestLoad = spriteManager.loadManifest(
+      `${base}/game-assets/manifests/core.json`,
+      base
+    );
   }
   return defaultManifestLoad;
 };

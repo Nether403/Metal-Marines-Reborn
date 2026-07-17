@@ -43,9 +43,14 @@ export default function Home() {
               RESUME :: {snapMission.title.replace("Operation: ", "")}
             </Button>
           )}
-          <Link href="/missions">
+          <Link href="/campaign">
             <Button size="lg" className="w-full text-lg h-14 font-mono bg-primary hover:bg-primary/90 text-primary-foreground border border-primary/50 shadow-[0_0_15px_rgba(0,255,128,0.3)]">
               NEW CAMPAIGN
+            </Button>
+          </Link>
+          <Link href="/missions">
+            <Button variant="outline" size="lg" className="w-full text-lg h-14 font-mono border-secondary/50 text-secondary hover:bg-secondary/10">
+              MISSION LIST
             </Button>
           </Link>
           <Link href="/how-to-play">

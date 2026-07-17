@@ -240,7 +240,7 @@ export default function Play() {
   }, [selectBuild, selectWeapon, setPaused, setViewLayer]);
 
   if (!missionId) {
-    setLocation("/missions");
+    setLocation("/campaign");
     return null;
   }
 
@@ -320,7 +320,7 @@ export default function Play() {
             onClick={() => {
               clearSnapshot();
               endMission();
-              setLocation("/missions");
+              setLocation("/campaign");
             }}
           >
             <X className="w-3.5 h-3.5 mr-1" /> ABORT
@@ -362,7 +362,7 @@ export default function Play() {
           onAbort={() => {
             clearSnapshot();
             endMission();
-            setLocation("/missions");
+            setLocation("/campaign");
           }}
         />
       )}
