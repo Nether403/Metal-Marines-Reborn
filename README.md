@@ -21,8 +21,7 @@ The playable game lives in `artifacts/metal-marines` and includes campaign missi
 ├── scripts/               # Workspace scripts
 ├── skills/                # Project-specific skill/reference docs
 ├── package.json           # Root workspace commands
-├── pnpm-workspace.yaml    # pnpm workspace + catalog config
-└── replit.md              # Replit/workspace notes
+└── pnpm-workspace.yaml    # pnpm workspace + catalog config
 ```
 
 ## Main game: `artifacts/metal-marines`
