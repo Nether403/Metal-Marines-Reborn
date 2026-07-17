@@ -14,13 +14,14 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
   HQ: {
     type: "HQ",
     name: "Headquarters",
-    hotkey: "",
-    costFunds: 0,
-    costEnergy: 0,
-    buildTime: 0,
+    hotkey: "B",
+    costFunds: 450,
+    costEnergy: 80,
+    buildTime: 12,
     maxHp: 1200,
-    description: "Command center. If destroyed, the war is lost.",
+    description: "Command base. Field up to 3. Defeat only when your last base falls.",
     fundsPerSec: 2,
+    maxPerSide: 3,
   },
   ENERGY_PLANT: {
     type: "ENERGY_PLANT",
@@ -127,7 +128,19 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     costEnergy: 60,
     buildTime: 7,
     maxHp: 300,
-    description: "Required to launch ICBMs, Dummies and AA missiles.",
+    description: "Required to launch Dummies and AA missiles.",
+  },
+  ICBM_SILO: {
+    type: "ICBM_SILO",
+    name: "ICBM Silo",
+    hotkey: "I",
+    costFunds: 900,
+    costEnergy: 280,
+    buildTime: 18,
+    maxHp: 800,
+    description: "3×3 strategic silo. All nine tiles must stay intact to authorize an ICBM launch.",
+    footprintW: 3,
+    footprintH: 3,
   },
   EMP_CANNON: {
     type: "EMP_CANNON",
@@ -175,6 +188,19 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     fireRate: 0.6,
     damage: 14,
   },
+  GUN_POD: {
+    type: "GUN_POD",
+    name: "Gun Pod",
+    hotkey: "G",
+    costFunds: 150,
+    costEnergy: 20,
+    buildTime: 4,
+    maxHp: 220,
+    description: "Classic Metal Marines bunker. Matches Marine toughness — counter with Anti-POD rifles.",
+    range: tileUnits(2.2),
+    fireRate: 0.65,
+    damage: 16,
+  },
   LAND_MINE: {
     type: "LAND_MINE",
     name: "Land Mine",
@@ -186,6 +212,36 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     description: "Hidden trap. Detonates beneath enemy Marines.",
     damage: 60,
   },
+  FACTORY: {
+    type: "FACTORY",
+    name: "Factory",
+    hotkey: "F",
+    costFunds: 280,
+    costEnergy: 70,
+    buildTime: 8,
+    maxHp: 320,
+    description: "Each active Factory speeds construction and upgrades across your island.",
+  },
+  DUMMY_BASE: {
+    type: "DUMMY_BASE",
+    name: "Dummy Base",
+    hotkey: "D",
+    costFunds: 100,
+    costEnergy: 15,
+    buildTime: 3,
+    maxHp: 280,
+    description: "Decoy HQ silhouette. Draws enemy fire and AI targeting priority.",
+  },
+  DUMMY_COVER: {
+    type: "DUMMY_COVER",
+    name: "Dummy Cover",
+    hotkey: "C",
+    costFunds: 60,
+    costEnergy: 10,
+    buildTime: 2,
+    maxHp: 40,
+    description: "Concealment screen. Masks adjacent friendly bases from enemy radar until struck.",
+  },
 };
 
 export const BUILDING_COST_SCALING: Partial<
@@ -195,10 +251,15 @@ export const BUILDING_COST_SCALING: Partial<
   SUPPLY_DEPOT: { freeCount: 1, rate: 0.26, exponent: 1.3, maxMultiplier: 3.25 },
   AA_GUN: { freeCount: 1, rate: 0.2, exponent: 1.22, maxMultiplier: 2.6 },
   GUN_TURRET: { freeCount: 1, rate: 0.18, exponent: 1.18, maxMultiplier: 2.4 },
+  GUN_POD: { freeCount: 1, rate: 0.2, exponent: 1.2, maxMultiplier: 2.5 },
   MISSILE_LAUNCHER: { freeCount: 1, rate: 0.24, exponent: 1.2, maxMultiplier: 2.8 },
+  ICBM_SILO: { freeCount: 0, rate: 0.4, exponent: 1.3, maxMultiplier: 2.5 },
   METAL_MARINE_BASE: { freeCount: 1, rate: 0.28, exponent: 1.24, maxMultiplier: 3 },
   RADAR_JAMMER: { freeCount: 1, rate: 0.24, exponent: 1.2, maxMultiplier: 2.6 },
   EMP_CANNON: { freeCount: 1, rate: 0.26, exponent: 1.22, maxMultiplier: 2.8 },
+  FACTORY: { freeCount: 1, rate: 0.3, exponent: 1.25, maxMultiplier: 2.8 },
+  DUMMY_BASE: { freeCount: 1, rate: 0.22, exponent: 1.2, maxMultiplier: 2.4 },
+  DUMMY_COVER: { freeCount: 2, rate: 0.15, exponent: 1.15, maxMultiplier: 2.2 },
   TUNNEL_ENTRANCE: { freeCount: 1, rate: 0.32, exponent: 1.24, maxMultiplier: 3 },
   SEISMIC_SENSOR: { freeCount: 1, rate: 0.18, exponent: 1.18, maxMultiplier: 2.2 },
   TERRAIN_DESTABILIZER: { freeCount: 1, rate: 0.32, exponent: 1.25, maxMultiplier: 3 },
@@ -216,20 +277,30 @@ export const WEAPON_COSTS: Record<ProjectileType, { funds: number; energy: numbe
 };
 
 export const WEAPON_LABELS: Record<ProjectileType, { name: string; hotkey: string; desc: string }> = {
-  ICBM: { name: "ICBM", hotkey: "Q", desc: "Heavy missile. Splash damage." },
+  ICBM: { name: "ICBM", hotkey: "Q", desc: "Heavy missile. Requires intact 3×3 ICBM Silo. Splash damage." },
   DUMMY: { name: "Dummy", hotkey: "W", desc: "Decoy. Bait enemy AA, scout fog." },
   AA: { name: "AA Missile", hotkey: "E", desc: "Manual intercept of an enemy missile." },
-  TRANSPORT_POD: { name: "Marine Drop", hotkey: "R", desc: "Launch a Metal Marine pod." },
+  TRANSPORT_POD: { name: "Marine Drop", hotkey: "R", desc: "Launch a Metal Marine pod (max 3 assaulting)." },
   EMP: { name: "EMP", hotkey: "T", desc: "Disable buildings near the strike zone for a short window." },
   TUNNEL_BUSTER: { name: "Buster", hotkey: "Y", desc: "Collapse tunnel tiles and destroy exposed underground units." },
 };
 
+export const MAX_HQ_PER_SIDE = 3;
+export const MAX_ASSAULT_MECHS = 3;
+export const AA_BASE_HIT_CHANCE = 0.5;
+export const AA_RADAR_HIT_BONUS = 0.05;
+export const FACTORY_BUILD_SPEED_BONUS = 0.18;
 export const ICBM_DAMAGE = 280;
 export const ICBM_SPLASH = tileUnits(1.35);
 export const MECH_HP = 220;
+export const MECH_HP_GUNNER_II = 300;
 export const MECH_DAMAGE = 28;
+export const MECH_DAMAGE_GUNNER_II = 34;
 export const MECH_SPEED = tileUnits(0.65);
+export const MECH_SPEED_GUNNER_II = tileUnits(0.72);
 export const MECH_ATTACK_COOLDOWN = 0.7;
+export const GUNNER_II_FUNDS_PREMIUM = 80;
+export const GUNNER_II_ENERGY_PREMIUM = 30;
 export const EMP_SPLASH = tileUnits(1.65);
 export const EMP_DISABLE_SECONDS = 10;
 export const JAMMER_FALSE_SIGNATURE_INTERVAL = 7;

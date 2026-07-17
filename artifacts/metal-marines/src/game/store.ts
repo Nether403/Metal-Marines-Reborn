@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type {
   BuildingType,
+  MechTier,
+  MechWeaponMode,
   MissionDef,
   ProjectileType,
   RuntimeState,
@@ -16,7 +18,7 @@ import {
   stepGame,
   uid,
 } from "./engine";
-import { GRID_H, GRID_W } from "./constants";
+import { BUILDINGS, GRID_H, GRID_W } from "./constants";
 import { hashSeed } from "./rng";
 import { createReplayFrameHash } from "./replay";
 import { getMission, MISSIONS } from "@/data/missions";
@@ -66,6 +68,8 @@ interface Store {
 
   selectBuild: (t: BuildingType | null) => void;
   selectWeapon: (t: ProjectileType | null) => void;
+  selectMechWeapon: (mode: MechWeaponMode) => void;
+  selectMechTier: (tier: MechTier) => void;
   setViewLayer: (layer: TileLayer) => void;
   tryBuild: (x: number, y: number) => boolean;
   tryFire: (wx: number, wy: number) => boolean;
@@ -83,51 +87,53 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
   const fogEnemy = new Array<boolean>(GRID_W * GRID_H).fill(false);
 
   const buildings: RuntimeState["buildings"] = [];
-  // Player HQ
-  buildings.push({
-    id: uid("b"),
-    type: "HQ",
-    owner: "PLAYER",
-    side: "PLAYER",
-    pos: mission.playerStartHQ,
-    hp: 1200,
-    maxHp: 1200,
-    buildTimeRemaining: 0,
-    buildTimeTotal: 0,
-    cooldown: 0,
-  });
-  // Enemy HQ
-  buildings.push({
-    id: uid("b"),
-    type: "HQ",
-    owner: "ENEMY",
-    side: "ENEMY",
-    pos: mission.enemyStartHQ,
-    hp: 1200,
-    maxHp: 1200,
-    buildTimeRemaining: 0,
-    buildTimeTotal: 0,
-    cooldown: 0,
-  });
-
-  // Give the AI a head-start of basic eco
-  const aiSeed = (type: BuildingType, x: number, y: number) => {
+  const pushBuilding = (
+    type: BuildingType,
+    side: "PLAYER" | "ENEMY",
+    pos: { x: number; y: number },
+    ready = true
+  ) => {
+    const spec = BUILDINGS[type];
     buildings.push({
       id: uid("b"),
       type,
-      owner: "ENEMY",
-      side: "ENEMY",
-      pos: { x, y },
-      hp: 220,
-      maxHp: 220,
-      buildTimeRemaining: 0,
-      buildTimeTotal: 0,
+      owner: side,
+      side,
+      pos,
+      footprintW: spec.footprintW ?? 1,
+      footprintH: spec.footprintH ?? 1,
+      hp: spec.maxHp,
+      maxHp: spec.maxHp,
+      buildTimeRemaining: ready ? 0 : spec.buildTime,
+      buildTimeTotal: ready ? 0 : spec.buildTime,
       cooldown: 0,
     });
   };
-  aiSeed("ENERGY_PLANT", mission.enemyStartHQ.x - 2, mission.enemyStartHQ.y);
-  aiSeed("SUPPLY_DEPOT", mission.enemyStartHQ.x + 2, mission.enemyStartHQ.y);
-  aiSeed("AA_GUN", mission.enemyStartHQ.x, mission.enemyStartHQ.y - 2);
+  // Player + enemy starting HQs (free, already constructed)
+  pushBuilding("HQ", "PLAYER", mission.playerStartHQ);
+  pushBuilding("HQ", "ENEMY", mission.enemyStartHQ);
+
+  // Give the AI a head-start of basic eco (gentler on easy missions)
+  pushBuilding("ENERGY_PLANT", "ENEMY", {
+    x: mission.enemyStartHQ.x - 2,
+    y: mission.enemyStartHQ.y,
+  });
+  pushBuilding("SUPPLY_DEPOT", "ENEMY", {
+    x: mission.enemyStartHQ.x + 2,
+    y: mission.enemyStartHQ.y,
+  });
+  if (mission.difficulty >= 2) {
+    pushBuilding("AA_GUN", "ENEMY", {
+      x: mission.enemyStartHQ.x,
+      y: mission.enemyStartHQ.y - 2,
+    });
+  }
+  if (mission.difficulty >= 3) {
+    pushBuilding("GUN_POD", "ENEMY", {
+      x: mission.enemyStartHQ.x + 1,
+      y: mission.enemyStartHQ.y + 1,
+    });
+  }
 
   const withTunnels = (tiles: Tile[], hq: { x: number; y: number }): Tile[] =>
     tiles.map((t) => {
@@ -160,11 +166,13 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
     alerts: [],
     selectedBuild: null,
     selectedWeapon: null,
+    selectedMechWeapon: "NORMAL",
+    selectedMechTier: "GUNNER_I",
     viewLayer: "SURFACE",
     terrainMutations: [],
     aiState: {
       phase: "ECO",
-      nextActionAt: mission.difficulty <= 1 ? 8 : mission.difficulty <= 2 ? 5 : 3,
+      nextActionAt: mission.difficulty <= 1 ? 14 : mission.difficulty <= 2 ? 10 : 6,
       builtCount: 0,
       memory: {
         seenPlayerBuildings: {},
@@ -264,6 +272,21 @@ export const useGame = create<Store>((set, get) => ({
     if (!rt) return;
     rt.selectedWeapon = t;
     rt.selectedBuild = null;
+    set({ runtime: { ...rt } });
+  },
+
+  selectMechWeapon: (mode) => {
+    const rt = get().runtime;
+    if (!rt) return;
+    rt.selectedMechWeapon = mode;
+    recordReplayCommand(rt, { type: "SELECT_WEAPON", payload: { mode } });
+    set({ runtime: { ...rt } });
+  },
+
+  selectMechTier: (tier) => {
+    const rt = get().runtime;
+    if (!rt) return;
+    rt.selectedMechTier = tier;
     set({ runtime: { ...rt } });
   },
 

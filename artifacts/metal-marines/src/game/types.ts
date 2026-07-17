@@ -14,12 +14,19 @@ export type BuildingType =
   | "WEATHER_CONTROL"
   | "BIOSPHERE_ENGINE"
   | "MISSILE_LAUNCHER"
+  | "ICBM_SILO"
   | "EMP_CANNON"
   | "METAL_MARINE_BASE"
   | "AA_GUN"
   | "GUN_TURRET"
-  | "LAND_MINE";
+  | "GUN_POD"
+  | "LAND_MINE"
+  | "FACTORY"
+  | "DUMMY_BASE"
+  | "DUMMY_COVER";
 export type ProjectileType = "ICBM" | "DUMMY" | "AA" | "TRANSPORT_POD" | "EMP" | "TUNNEL_BUSTER";
+export type MechWeaponMode = "NORMAL" | "ANTI_MMR" | "ANTI_POD";
+export type MechTier = "GUNNER_I" | "GUNNER_II";
 
 export interface Position {
   x: number;
@@ -42,6 +49,9 @@ export interface Building {
   type: BuildingType;
   owner: Owner;
   pos: Position;
+  /** Top-left of multi-tile footprint (same as pos for 1×1). */
+  footprintW: number;
+  footprintH: number;
   hp: number;
   maxHp: number;
   buildTimeRemaining: number;
@@ -82,6 +92,8 @@ export interface Mech {
   maxHp: number;
   state: "LANDING" | "WALKING" | "ATTACKING";
   attackCooldown: number;
+  tier: MechTier;
+  weaponMode: MechWeaponMode;
 }
 
 export interface Particle {
@@ -94,6 +106,8 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
+  /** Optional flipbook FX key prefix (explosion/smoke/muzzle). */
+  fx?: "explosion" | "smoke" | "muzzle";
 }
 
 export interface TerrainMutation {
@@ -184,6 +198,11 @@ export interface BuildingSpec {
   range?: number;
   damage?: number;
   fireRate?: number;
+  /** Multi-tile footprint width/height in tiles (default 1×1). */
+  footprintW?: number;
+  footprintH?: number;
+  /** Max instances per side (e.g. HQ capped at 3). */
+  maxPerSide?: number;
 }
 
 export interface MissionProgress {
@@ -220,6 +239,8 @@ export interface RuntimeState {
   alerts: AlertItem[];
   selectedBuild: BuildingType | null;
   selectedWeapon: ProjectileType | null;
+  selectedMechWeapon: MechWeaponMode;
+  selectedMechTier: MechTier;
   viewLayer: TileLayer;
   weatherActive?: {
     type: WeatherType;
