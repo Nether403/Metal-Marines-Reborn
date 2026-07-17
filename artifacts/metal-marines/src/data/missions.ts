@@ -193,10 +193,10 @@ export const MISSIONS: MissionDef[] = [
     enemyIsland: M1_E,
     playerStartHQ: { x: 5, y: 5 },
     enemyStartHQ: { x: 4, y: 5 },
-    enemyAggression: 0.22,
-    enemyEcoBias: 0.7,
-    startFunds: 1200,
-    startEnergy: 500,
+    enemyAggression: 0.12,
+    enemyEcoBias: 0.75,
+    startFunds: 1400,
+    startEnergy: 550,
   },
   {
     id: "m2",
@@ -289,6 +289,157 @@ export const MISSIONS: MissionDef[] = [
     startEnergy: 800,
   },
 ];
+
+const CAMPAIGN_EXTENSION: Array<{
+  id: string;
+  index: number;
+  title: string;
+  commanderId: string;
+  objective: string;
+  briefing: string;
+  difficulty: number;
+  aggression: number;
+  eco: number;
+  funds: number;
+  energy: number;
+  mapP: Tile[];
+  mapE: Tile[];
+}> = [
+  {
+    id: "m7",
+    index: 7,
+    title: "Operation: Triple Crown",
+    commanderId: "voss",
+    objective: "Hold three bases and crush the enemy HQ network.",
+    briefing:
+      "Doctrine update: field multiple Headquarters. Lose one and the war continues — lose all three and you fall. Build Gun Pods and a Factory before the tempo war begins.",
+    difficulty: 3,
+    aggression: 0.55,
+    eco: 0.55,
+    funds: 1600,
+    energy: 700,
+    mapP: M3_P,
+    mapE: M3_E,
+  },
+  {
+    id: "m8",
+    index: 8,
+    title: "Operation: Bunker Line",
+    commanderId: "rhe",
+    objective: "Crack Gun Pod bunkers with Anti-POD Marines.",
+    briefing:
+      "Enemy Gun Pods shrug off standard rifles. Switch Metal Marines to Anti-POD loadout, or watch your Gunners melt on the beach.",
+    difficulty: 4,
+    aggression: 0.6,
+    eco: 0.5,
+    funds: 1500,
+    energy: 650,
+    mapP: M4_P,
+    mapE: M4_E,
+  },
+  {
+    id: "m9",
+    index: 9,
+    title: "Operation: Ghost Base",
+    commanderId: "iyobi",
+    objective: "Use Dummy Bases and Cover to bait strikes.",
+    briefing:
+      "Decoy Headquarters draw fire. Dummy Cover masks adjacent bases from radar. Misdirect, then answer with ICBM Silo fire.",
+    difficulty: 4,
+    aggression: 0.65,
+    eco: 0.55,
+    funds: 1550,
+    energy: 680,
+    mapP: M2_P,
+    mapE: M2_E,
+  },
+  {
+    id: "m10",
+    index: 10,
+    title: "Operation: Silo Authority",
+    commanderId: "calder",
+    objective: "Authorize ICBM launches from an intact 3×3 silo.",
+    briefing:
+      "Standard Missile Silos no longer clear strategic warheads. Raise an ICBM Silo — all nine tiles must stay standing — and rewrite the map.",
+    difficulty: 5,
+    aggression: 0.7,
+    eco: 0.6,
+    funds: 1800,
+    energy: 800,
+    mapP: M5_P,
+    mapE: M5_E,
+  },
+  {
+    id: "m11",
+    index: 11,
+    title: "Operation: Radar Lattice",
+    commanderId: "stryx",
+    objective: "Stack Radar to push AA hit chance toward 100%.",
+    briefing:
+      "AA Batteries start at 50% intercept. Each Radar Array adds +5%. Build the lattice before their pods arrive.",
+    difficulty: 5,
+    aggression: 0.8,
+    eco: 0.55,
+    funds: 1700,
+    energy: 750,
+    mapP: M5_P,
+    mapE: M4_E,
+  },
+  {
+    id: "m12",
+    index: 12,
+    title: "Operation: Gunner Doctrine",
+    commanderId: "null_",
+    objective: "Field Gunner-II Marines with the correct weapon mode.",
+    briefing:
+      "Gunner-II frames cost more but hit harder. Pair Anti-MMR for mech duels and Anti-POD for bunker clearing. Max three assault Marines in flight or on the ground.",
+    difficulty: 6,
+    aggression: 0.85,
+    eco: 0.6,
+    funds: 1900,
+    energy: 850,
+    mapP: M6_P,
+    mapE: M6_E,
+  },
+];
+
+for (const ext of CAMPAIGN_EXTENSION) {
+  MISSIONS.push({
+    id: ext.id,
+    index: ext.index,
+    title: ext.title,
+    commanderId: ext.commanderId,
+    objective: ext.objective,
+    briefing: ext.briefing,
+    difficulty: ext.difficulty,
+    playerIsland: ext.mapP,
+    enemyIsland: ext.mapE,
+    playerStartHQ: { x: 5, y: 5 },
+    enemyStartHQ: { x: 5, y: 5 },
+    enemyAggression: ext.aggression,
+    enemyEcoBias: ext.eco,
+    startFunds: ext.funds,
+    startEnergy: ext.energy,
+  });
+}
+
+// Missions 13–20: seeded procedural ops to approach original campaign length
+for (let i = 13; i <= 20; i++) {
+  const seed = `campaign-${i}`;
+  const generated = createProceduralMission({
+    seed,
+    difficulty: Math.min(6, 3 + Math.floor((i - 13) / 2)),
+    title: `Operation: Frontier ${i}`,
+  });
+  MISSIONS.push({
+    ...generated,
+    id: `m${i}`,
+    index: i,
+    commanderId: ["voss", "rhe", "iyobi", "calder", "stryx", "null_"][(i - 1) % 6],
+    objective: generated.objective,
+    briefing: `${generated.briefing} Advanced campaign sector ${i}/20. Tunnel and ecology tech are authorized if you can afford the diversion.`,
+  });
+}
 
 export const getMission = (id: string) => {
   const fixed = MISSIONS.find((m) => m.id === id);

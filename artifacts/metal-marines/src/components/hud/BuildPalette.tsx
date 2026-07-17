@@ -7,20 +7,26 @@ import { Crosshair, Hammer, Radio, Rocket, Shield, Skull, Zap } from "lucide-rea
 import type { ReactNode } from "react";
 
 const buildOrder: BuildingType[] = [
+  "HQ",
   "ENERGY_PLANT",
   "SUPPLY_DEPOT",
+  "FACTORY",
   "RADAR",
   "RADAR_JAMMER",
+  "DUMMY_BASE",
+  "DUMMY_COVER",
   "TUNNEL_ENTRANCE",
   "SEISMIC_SENSOR",
   "TERRAIN_DESTABILIZER",
   "WEATHER_CONTROL",
   "BIOSPHERE_ENGINE",
   "MISSILE_LAUNCHER",
+  "ICBM_SILO",
   "EMP_CANNON",
   "METAL_MARINE_BASE",
   "AA_GUN",
   "GUN_TURRET",
+  "GUN_POD",
   "LAND_MINE",
 ];
 
@@ -30,6 +36,9 @@ const buildCategory: Record<BuildingType, "BASE" | "INTEL" | "WEAPONS" | "ECOLOG
   HQ: "BASE",
   ENERGY_PLANT: "BASE",
   SUPPLY_DEPOT: "BASE",
+  FACTORY: "BASE",
+  DUMMY_BASE: "BASE",
+  DUMMY_COVER: "BASE",
   RADAR: "INTEL",
   RADAR_JAMMER: "INTEL",
   TUNNEL_ENTRANCE: "INTEL",
@@ -38,10 +47,12 @@ const buildCategory: Record<BuildingType, "BASE" | "INTEL" | "WEAPONS" | "ECOLOG
   WEATHER_CONTROL: "ECOLOGY",
   BIOSPHERE_ENGINE: "ECOLOGY",
   MISSILE_LAUNCHER: "WEAPONS",
+  ICBM_SILO: "WEAPONS",
   EMP_CANNON: "WEAPONS",
   METAL_MARINE_BASE: "WEAPONS",
   AA_GUN: "WEAPONS",
   GUN_TURRET: "WEAPONS",
+  GUN_POD: "WEAPONS",
   LAND_MINE: "WEAPONS",
 };
 
@@ -72,10 +83,15 @@ const shortName = (name: string) =>
 export default function BuildPalette({ state }: { state: RuntimeState }) {
   const selectBuild = useGame((s) => s.selectBuild);
   const selectWeapon = useGame((s) => s.selectWeapon);
+  const selectMechWeapon = useGame((s) => s.selectMechWeapon);
+  const selectMechTier = useGame((s) => s.selectMechTier);
 
   const canAfford = (f: number, e: number) => state.playerFunds >= f && state.playerEnergy >= e;
   const hasLauncher = state.buildings.some(
     (b) => b.side === "PLAYER" && b.type === "MISSILE_LAUNCHER" && b.hp > 0 && b.buildTimeRemaining <= 0
+  );
+  const hasIcbmSilo = state.buildings.some(
+    (b) => b.side === "PLAYER" && b.type === "ICBM_SILO" && b.hp > 0 && b.buildTimeRemaining <= 0
   );
   const hasMechBay = state.buildings.some(
     (b) => b.side === "PLAYER" && b.type === "METAL_MARINE_BASE" && b.hp > 0 && b.buildTimeRemaining <= 0
@@ -87,6 +103,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
   const readyWeapons = weaponOrder.filter((t) => {
     if (t === "TRANSPORT_POD") return hasMechBay;
     if (t === "EMP") return hasEmp;
+    if (t === "ICBM") return hasIcbmSilo;
     return hasLauncher;
   }).length;
 
@@ -183,7 +200,11 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
               const cost = WEAPON_COSTS[t];
               const lbl = WEAPON_LABELS[t];
               const sel = state.selectedWeapon === t;
-              const needs = t === "TRANSPORT_POD" ? hasMechBay : t === "EMP" ? hasEmp : hasLauncher;
+              const needs =
+                t === "TRANSPORT_POD" ? hasMechBay :
+                t === "EMP" ? hasEmp :
+                t === "ICBM" ? hasIcbmSilo :
+                hasLauncher;
               const ok = canAfford(cost.funds, cost.energy) && needs;
               const icon =
                 t === "AA" ? <Crosshair className="h-3 w-3" /> :
@@ -197,7 +218,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                   selected={sel}
                   affordable={ok}
                   onClick={() => selectWeapon(sel ? null : t)}
-                  title={lbl.desc + (needs ? "" : " (Requires launcher)")}
+                  title={lbl.desc + (needs ? "" : " (Requires launcher/silo)")}
                   hotkey={lbl.hotkey}
                   icon={icon}
                   name={lbl.name}
@@ -207,6 +228,45 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                 />
               );
             })}
+          </div>
+
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {(["GUNNER_I", "GUNNER_II"] as const).map((tier) => (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => selectMechTier(tier)}
+                className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
+                style={{
+                  border: `1px solid ${state.selectedMechTier === tier ? "rgba(239,68,68,0.8)" : "rgba(148,163,184,0.3)"}`,
+                  background: state.selectedMechTier === tier ? "rgba(239,68,68,0.2)" : "rgba(15,23,42,0.6)",
+                  color: state.selectedMechTier === tier ? "#fecaca" : "#94a3b8",
+                }}
+                title={tier === "GUNNER_II" ? "Upgraded Marine (+HP/dmg, premium drop cost)" : "Standard Gunner-I"}
+              >
+                {tier === "GUNNER_I" ? "Gunner I" : "Gunner II"}
+              </button>
+            ))}
+            {(["NORMAL", "ANTI_MMR", "ANTI_POD"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => selectMechWeapon(mode)}
+                className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
+                style={{
+                  border: `1px solid ${state.selectedMechWeapon === mode ? "rgba(55,216,255,0.8)" : "rgba(148,163,184,0.3)"}`,
+                  background: state.selectedMechWeapon === mode ? "rgba(55,216,255,0.15)" : "rgba(15,23,42,0.6)",
+                  color: state.selectedMechWeapon === mode ? "#7dd3fc" : "#94a3b8",
+                }}
+                title={
+                  mode === "NORMAL" ? "Balanced vs Marines and Gun Pods" :
+                  mode === "ANTI_MMR" ? "+50% vs enemy Marines, -50% vs Gun Pods" :
+                  "+50% vs Gun Pods, -50% vs Marines"
+                }
+              >
+                {mode === "ANTI_MMR" ? "Anti-MMR" : mode === "ANTI_POD" ? "Anti-POD" : "Normal"}
+              </button>
+            ))}
           </div>
         </div>
       </div>

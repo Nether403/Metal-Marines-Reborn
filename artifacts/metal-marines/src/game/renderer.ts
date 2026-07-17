@@ -19,7 +19,7 @@ import type {
   RuntimeState,
   Tile,
 } from "./types";
-import { islandOriginX, projectileCurrentPos, tileToWorld } from "./engine";
+import { islandOriginX, isBuildable, projectileCurrentPos, tileToWorld } from "./engine";
 import { spriteManager } from "./sprites";
 
 const terrainSpriteKey: Record<string, string> = {
@@ -338,9 +338,17 @@ const buildingSpriteKey = (b: Building, now: number): string => {
 
 const mechSpriteKey = (m: Mech, time: number): string | null => {
   const owner = m.owner === "PLAYER" ? "player" : "enemy";
-  const state = m.state.toLowerCase();
-  const animated = spriteManager.animationFrame(`unit.mech.${owner}.${state}`, time * 1000);
-  return animated ?? `unit.mech.${owner}.${state}`;
+  const stateKey =
+    m.state === "ATTACKING" ? "attacking" :
+    m.state === "LANDING" ? "landing" :
+    m.state === "WALKING" ? "walking" :
+    "idle";
+  const animated = spriteManager.animationFrame(`unit.mech.${owner}.${stateKey}`, time * 1000);
+  if (animated) return animated;
+  // Static fallbacks for state names that map onto atlas frames
+  if (stateKey === "attacking") return `unit.mech.${owner}.fighting`;
+  if (stateKey === "landing") return `unit.mech.${owner}.boarding`;
+  return `unit.mech.${owner}.${stateKey}`;
 };
 
 const factionVisuals: Record<Owner, { primary: string; secondary: string; trim: string; glow: string; glass: string }> = {
@@ -462,11 +470,16 @@ const buildingFill: Record<BuildingType, string> = {
   WEATHER_CONTROL: "#38bdf8",
   BIOSPHERE_ENGINE: "#22c55e",
   MISSILE_LAUNCHER: "#f97316",
+  ICBM_SILO: "#fb7185",
   EMP_CANNON: "#22d3ee",
   METAL_MARINE_BASE: "#ef4444",
   AA_GUN: "#a3e635",
   GUN_TURRET: "#fb923c",
+  GUN_POD: "#f87171",
   LAND_MINE: "#64748b",
+  FACTORY: "#eab308",
+  DUMMY_BASE: "#94a3b8",
+  DUMMY_COVER: "#64748b",
 };
 
 const buildingGlyph: Record<BuildingType, string> = {
@@ -481,11 +494,16 @@ const buildingGlyph: Record<BuildingType, string> = {
   WEATHER_CONTROL: "W",
   BIOSPHERE_ENGINE: "BIO",
   MISSILE_LAUNCHER: "M",
+  ICBM_SILO: "ICB",
   EMP_CANNON: "EMP",
   METAL_MARINE_BASE: "B",
   AA_GUN: "A",
   GUN_TURRET: "T",
+  GUN_POD: "GP",
   LAND_MINE: "*",
+  FACTORY: "F",
+  DUMMY_BASE: "DB",
+  DUMMY_COVER: "DC",
 };
 
 const drawRectCentered = (
@@ -624,8 +642,9 @@ const drawProceduralBuilding = (ctx: CanvasRenderingContext2D, b: Building, cx: 
       ctx.stroke();
       break;
     case "MISSILE_LAUNCHER":
+    case "ICBM_SILO":
     case "EMP_CANNON":
-      drawRectCentered(ctx, cx, cy + 1, 32, 20, metal);
+      drawRectCentered(ctx, cx, cy + 1, b.type === "ICBM_SILO" ? 44 : 32, b.type === "ICBM_SILO" ? 28 : 20, metal);
       ctx.fillStyle = accent;
       ctx.beginPath();
       ctx.moveTo(cx - 5, cy - 25);
@@ -637,6 +656,7 @@ const drawProceduralBuilding = (ctx: CanvasRenderingContext2D, b: Building, cx: 
       ctx.stroke();
       break;
     case "METAL_MARINE_BASE":
+    case "FACTORY":
       drawRectCentered(ctx, cx, cy + 1, 38, 22, metal);
       drawRectCentered(ctx, cx, cy - 13, 24, 12, "#111827", visuals.glow);
       drawRectCentered(ctx, cx - 10, cy + 4, 7, 13, visuals.secondary);
@@ -644,14 +664,27 @@ const drawProceduralBuilding = (ctx: CanvasRenderingContext2D, b: Building, cx: 
       break;
     case "AA_GUN":
     case "GUN_TURRET":
-      drawRectCentered(ctx, cx, cy + 4, 30, 17, metal);
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 5;
+    case "GUN_POD":
+      drawRectCentered(ctx, cx, cy + 2, 22, 18, metal);
+      ctx.fillStyle = accent;
       ctx.beginPath();
-      ctx.moveTo(cx, cy - 5);
-      ctx.lineTo(cx + 18, cy - 22);
-      ctx.stroke();
+      ctx.arc(cx, cy - 10, 10, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case "DUMMY_BASE":
+      drawRectCentered(ctx, cx, cy - 7, 38, 32, "rgba(148,163,184,0.35)", visuals.secondary);
+      drawBuildingLabel(ctx, cx, cy - 4, b.type);
+      break;
+    case "DUMMY_COVER":
+      ctx.strokeStyle = visuals.secondary;
       ctx.lineWidth = 2;
+      ctx.strokeRect(cx - 18, cy - 18, 36, 28);
+      ctx.beginPath();
+      ctx.moveTo(cx - 14, cy - 12);
+      ctx.lineTo(cx + 14, cy + 6);
+      ctx.moveTo(cx + 14, cy - 12);
+      ctx.lineTo(cx - 14, cy + 6);
+      ctx.stroke();
       break;
     case "LAND_MINE":
       ctx.fillStyle = b.side === "PLAYER" ? "rgba(148,163,184,0.76)" : "rgba(15,23,42,0.36)";
@@ -833,6 +866,7 @@ const drawOrientedProjectileBody = (
 const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
   const cur = projectileCurrentPos(p);
   const color = projectileColor(p);
+  const angle = Math.atan2(p.targetWY - p.startWY, p.targetWX - p.startWX);
 
   // Smoke trail
   for (let i = 0; i < 12; i++) {
@@ -851,6 +885,19 @@ const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
     ctx.fill();
   }
 
+  const spriteKey =
+    p.type === "ICBM" ? "projectile.icbm" :
+    p.type === "EMP" ? "projectile.emp" :
+    p.type === "TRANSPORT_POD" ? "projectile.transport_pod" :
+    p.type === "TUNNEL_BUSTER" ? "projectile.tunnel_buster" :
+    p.type === "DUMMY" ? "projectile.dummy" :
+    p.type === "AA" ? "projectile.aa" :
+    "";
+
+  if (spriteKey && spriteManager.draw(ctx, spriteKey, cur.x, cur.y, { rotation: angle + Math.PI / 2, scale: 1 })) {
+    return;
+  }
+
   ctx.save();
   ctx.strokeStyle = `${color}66`;
   ctx.lineWidth = p.type === "EMP" ? 2.5 : 1.5;
@@ -860,7 +907,6 @@ const drawProjectile = (ctx: CanvasRenderingContext2D, p: Projectile) => {
   drawOrientedProjectileBody(ctx, p, cur.x, cur.y, color);
 
   if (p.type !== "TRANSPORT_POD") {
-    const angle = Math.atan2(p.targetWY - p.startWY, p.targetWX - p.startWX);
     ctx.strokeStyle = `${color}88`;
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -964,6 +1010,12 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
 };
 
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
+  if (p.fx) {
+    const frame = spriteManager.animationFrame(`fx.${p.fx}`, p.life * 1000);
+    if (frame && spriteManager.draw(ctx, frame, p.pos.x, p.pos.y, { scale: p.size / 48, alpha: Math.max(0, 1 - p.life / p.maxLife) })) {
+      return;
+    }
+  }
   const lifeRatio = 1 - p.life / p.maxLife;
   const alpha = Math.max(0, lifeRatio);
   const radius = Math.max(1, p.size * lifeRatio);
@@ -1103,30 +1155,25 @@ const drawPlacementGhost = (
 ) => {
   if (!hover) return;
   if (state.selectedBuild && hover.side === "PLAYER") {
+    const spec = BUILDINGS[state.selectedBuild];
+    const fw = spec.footprintW ?? 1;
+    const fh = spec.footprintH ?? 1;
     const px = islandOriginX("PLAYER") + hover.x * TILE_PX;
     const py = hover.y * TILE_PX;
-    const tile = state.playerIsland[hover.y * GRID_W + hover.x];
-    const ok =
-      tile &&
-      tile.terrain !== "WATER" &&
-      tile.terrain !== "MOUNTAIN" &&
-      !(tile.terrain === "FOREST" && state.selectedBuild !== "LAND_MINE") &&
-      !state.buildings.some(
-        (b) => b.side === "PLAYER" && b.pos.x === hover.x && b.pos.y === hover.y && b.hp > 0
-      );
+    const ok = isBuildable(state.playerIsland, state.buildings, "PLAYER", state.selectedBuild, hover.x, hover.y);
     ctx.strokeStyle = ok ? "#22c55e" : "#ef4444";
     ctx.lineWidth = 2;
     ctx.setLineDash([7, 5]);
-    ctx.strokeRect(px + 4, py + 4, TILE_PX - 8, TILE_PX - 8);
+    ctx.strokeRect(px + 4, py + 4, TILE_PX * fw - 8, TILE_PX * fh - 8);
     ctx.setLineDash([]);
     ctx.fillStyle = ok ? "rgba(34,197,94,0.14)" : "rgba(239,68,68,0.16)";
-    ctx.fillRect(px + 3, py + 3, TILE_PX - 6, TILE_PX - 6);
+    ctx.fillRect(px + 3, py + 3, TILE_PX * fw - 6, TILE_PX * fh - 6);
     ctx.strokeStyle = ok ? "rgba(125,211,252,0.48)" : "rgba(248,113,113,0.52)";
     for (let i = 0; i < 4; i++) {
       const sy = py + 10 + i * 11;
       ctx.beginPath();
       ctx.moveTo(px + 9, sy);
-      ctx.lineTo(px + TILE_PX - 9, sy);
+      ctx.lineTo(px + TILE_PX * fw - 9, sy);
       ctx.stroke();
     }
   }

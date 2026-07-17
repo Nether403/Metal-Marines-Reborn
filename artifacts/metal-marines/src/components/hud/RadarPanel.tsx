@@ -164,8 +164,8 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
       const sweep = ((performance.now() / 1000) % 3) * ((Math.PI * 2) / 3);
       const cx = MAP_W / 2;
       const cy = MAP_H / 2;
-      const grad = ctx.createConicalGradient
-        ? null // Safari doesn't support conical gradient on canvas
+      const grad = typeof ctx.createConicGradient === "function"
+        ? null // Sweep uses a linear wedge below; conical gradient reserved for future polish
         : null;
       void grad;
       // Approximate cone sweep with a thin wedge

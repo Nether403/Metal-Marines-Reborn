@@ -1,4 +1,6 @@
 import {
+  AA_BASE_HIT_CHANCE,
+  AA_RADAR_HIT_BONUS,
   BUILDINGS,
   BIOSPHERE_ECONOMY_BONUS,
   BIOSPHERE_ENGINE_COOLDOWN,
@@ -6,16 +8,23 @@ import {
   DUST_STORM_MECH_SPEED_MULTIPLIER,
   EMP_DISABLE_SECONDS,
   EMP_SPLASH,
+  FACTORY_BUILD_SPEED_BONUS,
   GRID_H,
   GRID_W,
+  GUNNER_II_ENERGY_PREMIUM,
+  GUNNER_II_FUNDS_PREMIUM,
   ICBM_DAMAGE,
   ICBM_SPLASH,
   ISLAND_PX_H,
   ISLAND_PX_W,
+  MAX_ASSAULT_MECHS,
   MECH_ATTACK_COOLDOWN,
   MECH_DAMAGE,
+  MECH_DAMAGE_GUNNER_II,
   MECH_HP,
+  MECH_HP_GUNNER_II,
   MECH_SPEED,
+  MECH_SPEED_GUNNER_II,
   JAMMER_FALSE_SIGNATURE_INTERVAL,
   SEISMIC_DETECTION_SECONDS,
   SEISMIC_SENSOR_RANGE,
@@ -40,6 +49,7 @@ import type {
   Building,
   BuildingType,
   Mech,
+  MechWeaponMode,
   MissionDef,
   Owner,
   Particle,
@@ -101,6 +111,29 @@ export const inIsland = (side: Owner, wx: number, wy: number): boolean => {
   return wx >= ox && wx < ox + ISLAND_PX_W && wy >= 0 && wy < ISLAND_PX_H;
 };
 
+export const footprintTiles = (type: BuildingType, x: number, y: number): Position[] => {
+  const spec = BUILDINGS[type];
+  const fw = spec.footprintW ?? 1;
+  const fh = spec.footprintH ?? 1;
+  const tiles: Position[] = [];
+  for (let dy = 0; dy < fh; dy++) {
+    for (let dx = 0; dx < fw; dx++) {
+      tiles.push({ x: x + dx, y: y + dy });
+    }
+  }
+  return tiles;
+};
+
+export const buildingOccupies = (b: Building, x: number, y: number): boolean => {
+  const fw = b.footprintW ?? 1;
+  const fh = b.footprintH ?? 1;
+  return x >= b.pos.x && x < b.pos.x + fw && y >= b.pos.y && y < b.pos.y + fh;
+};
+
+/** ICBM silo can fire only when every footprint tile is still part of a living silo (hp > 0). */
+export const isIcbmSiloIntact = (b: Building): boolean =>
+  b.type === "ICBM_SILO" && b.hp > 0 && b.buildTimeRemaining <= 0;
+
 export const isBuildable = (
   tiles: Tile[],
   buildings: Building[],
@@ -109,18 +142,28 @@ export const isBuildable = (
   x: number,
   y: number
 ): boolean => {
-  if (x < 0 || y < 0 || x >= GRID_W || y >= GRID_H) return false;
-  const t = getTile(tiles, x, y);
-  if (!t) return false;
-  if (t.terrain === "WATER") return false;
-  if (t.terrain === "MOUNTAIN") return false;
-  if (t.terrain === "TOXIC_SLUDGE") return false;
-  if (t.terrain === "FOREST" && type !== "LAND_MINE") return false;
-  // Footprint check (1x1 for simplicity)
-  const occ = buildings.some(
-    (b) => b.side === side && b.pos.x === x && b.pos.y === y && b.hp > 0
-  );
-  if (occ) return false;
+  const spec = BUILDINGS[type];
+  const fw = spec.footprintW ?? 1;
+  const fh = spec.footprintH ?? 1;
+  if (x < 0 || y < 0 || x + fw > GRID_W || y + fh > GRID_H) return false;
+
+  if (spec.maxPerSide != null) {
+    const living = buildings.filter((b) => b.side === side && b.type === type && b.hp > 0).length;
+    if (living >= spec.maxPerSide) return false;
+  }
+
+  for (const cell of footprintTiles(type, x, y)) {
+    const t = getTile(tiles, cell.x, cell.y);
+    if (!t) return false;
+    if (t.terrain === "WATER") return false;
+    if (t.terrain === "MOUNTAIN") return false;
+    if (t.terrain === "TOXIC_SLUDGE") return false;
+    if (t.terrain === "FOREST" && type !== "LAND_MINE") return false;
+    const occ = buildings.some(
+      (b) => b.side === side && b.hp > 0 && buildingOccupies(b, cell.x, cell.y)
+    );
+    if (occ) return false;
+  }
   return true;
 };
 
@@ -147,16 +190,26 @@ export const buildBuilding = (
   if (!isBuildable(tiles, state.buildings, side, type, x, y)) return false;
   state[fundsRef] -= cost.funds;
   state[energyRef] -= cost.energy;
+  const fw = spec.footprintW ?? 1;
+  const fh = spec.footprintH ?? 1;
+  // Factory bonus shortens remaining build time for new structures
+  const factories = state.buildings.filter(
+    (b) => b.side === side && b.type === "FACTORY" && isBuildingActive(b, state.elapsed)
+  ).length;
+  const speed = 1 + factories * FACTORY_BUILD_SPEED_BONUS;
+  const buildTime = spec.buildTime / speed;
   state.buildings.push({
     id: uid("b"),
     type,
     owner: side,
     side,
     pos: { x, y },
+    footprintW: fw,
+    footprintH: fh,
     hp: spec.maxHp,
     maxHp: spec.maxHp,
-    buildTimeRemaining: spec.buildTime,
-    buildTimeTotal: spec.buildTime,
+    buildTimeRemaining: buildTime,
+    buildTimeTotal: buildTime,
     cooldown: 0,
   });
   if (type === "TUNNEL_ENTRANCE") carveTunnelAround(state, side, { x, y }, 2);
@@ -288,38 +341,50 @@ export const launchMissile = (
   targetWY: number,
   payload?: { mechId?: string }
 ): boolean => {
-  const cost = WEAPON_COSTS[type];
+  let cost = { ...WEAPON_COSTS[type] };
+  if (type === "TRANSPORT_POD" && state.selectedMechTier === "GUNNER_II") {
+    cost = {
+      funds: cost.funds + GUNNER_II_FUNDS_PREMIUM,
+      energy: cost.energy + GUNNER_II_ENERGY_PREMIUM,
+    };
+  }
   const fundsRef = side === "PLAYER" ? "playerFunds" : "enemyFunds";
   const energyRef = side === "PLAYER" ? "playerEnergy" : "enemyEnergy";
   if (state[fundsRef] < cost.funds || state[energyRef] < cost.energy) return false;
 
-  // Need a launcher / mech bay alive on this side
-  const requiresLauncher = type === "ICBM" || type === "DUMMY" || type === "AA" || type === "TUNNEL_BUSTER";
+  // Assault cap: original Metal Marines limited concurrent marine drops
+  if (type === "TRANSPORT_POD") {
+    const assaulting = state.mechs.filter((m) => m.owner === side && m.hp > 0).length;
+    const inbound = state.projectiles.filter((p) => p.owner === side && p.type === "TRANSPORT_POD").length;
+    if (assaulting + inbound >= MAX_ASSAULT_MECHS) return false;
+  }
+
+  const requiresLauncher = type === "DUMMY" || type === "AA" || type === "TUNNEL_BUSTER";
+  const requiresIcbmSilo = type === "ICBM";
   const requiresMechBay = type === "TRANSPORT_POD";
   const requiresEmp = type === "EMP";
-  const has = state.buildings.some(
-    (b) =>
-      b.side === side &&
-      isBuildingActive(b, state.elapsed) &&
-      ((requiresLauncher && b.type === "MISSILE_LAUNCHER") ||
-        (requiresMechBay && b.type === "METAL_MARINE_BASE") ||
-        (requiresEmp && b.type === "EMP_CANNON"))
-  );
+  const has = state.buildings.some((b) => {
+    if (b.side !== side || !isBuildingActive(b, state.elapsed)) return false;
+    if (requiresIcbmSilo) return isIcbmSiloIntact(b);
+    if (requiresLauncher && b.type === "MISSILE_LAUNCHER") return true;
+    if (requiresMechBay && b.type === "METAL_MARINE_BASE") return true;
+    if (requiresEmp && b.type === "EMP_CANNON") return true;
+    return false;
+  });
   if (!has) return false;
 
   state[fundsRef] -= cost.funds;
   state[energyRef] -= cost.energy;
 
-  // Find the launcher to use as start position (or mech bay)
-  const launcher = state.buildings.find(
-    (b) =>
-      b.side === side &&
-      isBuildingActive(b, state.elapsed) &&
-      ((requiresLauncher && b.type === "MISSILE_LAUNCHER") ||
-        (requiresMechBay && b.type === "METAL_MARINE_BASE") ||
-        (requiresEmp && b.type === "EMP_CANNON"))
-  )!;
-  const start = tileToWorld(side, launcher.pos.x, launcher.pos.y);
+  const launcher = state.buildings.find((b) => {
+    if (b.side !== side || !isBuildingActive(b, state.elapsed)) return false;
+    if (requiresIcbmSilo) return isIcbmSiloIntact(b);
+    if (requiresLauncher && b.type === "MISSILE_LAUNCHER") return true;
+    if (requiresMechBay && b.type === "METAL_MARINE_BASE") return true;
+    if (requiresEmp && b.type === "EMP_CANNON") return true;
+    return false;
+  })!;
+  const start = tileToWorld(side, launcher.pos.x + Math.floor((launcher.footprintW ?? 1) / 2), launcher.pos.y + Math.floor((launcher.footprintH ?? 1) / 2));
   const target = side === "PLAYER" ? "ENEMY" : "PLAYER";
 
   const speed =
@@ -406,10 +471,12 @@ export const explodeAt = (
   const ti = worldToTile(side, wx, wy);
   revealAround(state, side, ti.x, ti.y, 1);
 
-  // Damage buildings on that side
+  // Damage buildings on that side (use footprint center for multi-tile)
   for (const b of state.buildings) {
     if (b.side !== side) continue;
-    const bw = tileToWorld(side, b.pos.x, b.pos.y);
+    const cx = b.pos.x + Math.floor((b.footprintW ?? 1) / 2);
+    const cy = b.pos.y + Math.floor((b.footprintH ?? 1) / 2);
+    const bw = tileToWorld(side, cx, cy);
     const d = distance(bw.x, bw.y, wx, wy);
     if (d <= splashRadius) {
       const falloff = 1 - d / Math.max(splashRadius, 1);
@@ -442,7 +509,32 @@ export const spawnExplosion = (
   wy: number,
   big: boolean
 ) => {
-  const n = big ? 36 : 18;
+  // Anchor flipbook particle
+  state.particles.push({
+    id: uid("pa"),
+    side,
+    pos: { x: wx, y: wy },
+    vx: 0,
+    vy: 0,
+    life: 0,
+    maxLife: big ? 0.45 : 0.32,
+    color: "#fbbf24",
+    size: big ? 48 : 32,
+    fx: "explosion",
+  });
+  state.particles.push({
+    id: uid("pa"),
+    side,
+    pos: { x: wx, y: wy - 6 },
+    vx: 0,
+    vy: -12,
+    life: 0,
+    maxLife: 0.55,
+    color: "#94a3b8",
+    size: 36,
+    fx: "smoke",
+  });
+  const n = big ? 18 : 10;
   const palette = big
     ? ["#fef3c7", "#fbbf24", "#f97316", "#dc2626", "#991b1b"]
     : ["#fde68a", "#fbbf24", "#f97316"];
@@ -539,20 +631,35 @@ const tickResources = (state: RuntimeState, dt: number) => {
 };
 
 const tickBuildings = (state: RuntimeState, dt: number) => {
-  for (const b of state.buildings) {
-    if (b.buildTimeRemaining > 0) {
-      b.buildTimeRemaining = Math.max(0, b.buildTimeRemaining - dt);
+  for (const side of ["PLAYER", "ENEMY"] as Owner[]) {
+    const factories = state.buildings.filter(
+      (b) => b.side === side && b.type === "FACTORY" && isBuildingActive(b, state.elapsed)
+    ).length;
+    const speed = 1 + factories * FACTORY_BUILD_SPEED_BONUS;
+    for (const b of state.buildings) {
+      if (b.side !== side) continue;
+      if (b.buildTimeRemaining > 0) {
+        b.buildTimeRemaining = Math.max(0, b.buildTimeRemaining - dt * speed);
+      }
+      if (b.cooldown > 0) b.cooldown -= dt;
     }
-    if (b.cooldown > 0) b.cooldown -= dt;
   }
-  // Remove destroyed buildings (except HQ — kept to detect loss)
+  // Remove destroyed buildings (keep ruined HQs for end-screen / multi-base accounting)
   for (let i = state.buildings.length - 1; i >= 0; i--) {
     const b = state.buildings[i];
     if (b.hp <= 0) {
-      if (b.type === "HQ") continue; // Keep ruined HQ
+      if (b.type === "HQ") continue;
       state.buildings.splice(i, 1);
     }
   }
+};
+
+const aaHitChance = (state: RuntimeState, side: Owner, projectileType: ProjectileType): number => {
+  if (projectileType === "DUMMY") return 1;
+  const radars = state.buildings.filter(
+    (b) => b.side === side && b.type === "RADAR" && isBuildingActive(b, state.elapsed)
+  ).length;
+  return Math.min(1, AA_BASE_HIT_CHANCE + radars * AA_RADAR_HIT_BONUS);
 };
 
 const applyEmpAt = (state: RuntimeState, side: Owner, wx: number, wy: number) => {
@@ -745,8 +852,8 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
         if (distance(bw.x, bw.y, cur.x, cur.y) <= r) {
           // Fire interceptor
           b.cooldown = 1 / (BUILDINGS.AA_GUN.fireRate ?? 1.2);
-          // 70% intercept chance for ICBMs/PODS, 100% for dummies
-          const prob = p.type === "DUMMY" ? 1 : 0.7;
+          // Original formula: 50% base + 5% per Radar, capped at 100%
+          const prob = aaHitChance(state, b.side, p.type);
           if (rng(state) < prob) {
             p.intercepted = true;
           }
@@ -765,15 +872,21 @@ const tickProjectiles = (state: RuntimeState, dt: number) => {
         if (t && t.terrain !== "WATER") {
           revealAround(state, p.side, ti.x, ti.y, 2);
           const wp = tileToWorld(p.side, ti.x, ti.y);
+          const tier = p.owner === "PLAYER" ? state.selectedMechTier : "GUNNER_I";
+          const weaponMode: MechWeaponMode =
+            p.owner === "PLAYER" ? state.selectedMechWeapon : "NORMAL";
+          const maxHp = tier === "GUNNER_II" ? MECH_HP_GUNNER_II : MECH_HP;
           state.mechs.push({
             id: uid("m"),
             owner: p.owner,
             side: p.side,
             pos: { x: wp.x, y: wp.y },
-            hp: MECH_HP,
-            maxHp: MECH_HP,
-            state: "WALKING",
-            attackCooldown: 0,
+            hp: maxHp,
+            maxHp,
+            state: "LANDING",
+            attackCooldown: 0.35,
+            tier,
+            weaponMode,
           });
           sfx("land");
         } else {
@@ -872,17 +985,22 @@ const tickMechs = (state: RuntimeState, dt: number) => {
       }
     }
 
-    // Gun turrets shoot at us
+    // Gun turrets and Gun Pods shoot at us
     for (const b of state.buildings) {
-      if (b.side !== m.side || b.type !== "GUN_TURRET" || b.hp <= 0) continue;
+      if (b.side !== m.side || (b.type !== "GUN_TURRET" && b.type !== "GUN_POD") || b.hp <= 0) continue;
       if (layer === "UNDERGROUND" && (m.detectedUntil ?? 0) <= state.elapsed) continue;
       if (!isBuildingActive(b, state.elapsed) || b.cooldown > 0) continue;
       const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
-      const r = BUILDINGS.GUN_TURRET.range ?? 110;
+      const spec = BUILDINGS[b.type];
+      const r = spec.range ?? 110;
       if (distance(bw.x, bw.y, m.pos.x, m.pos.y) <= r) {
-        b.cooldown = 1 / (BUILDINGS.GUN_TURRET.fireRate ?? 0.6);
+        b.cooldown = 1 / (spec.fireRate ?? 0.6);
         const weatherPenalty = state.weatherActive?.type === "TREMOR" ? 1 - TREMOR_DEFENSE_PENALTY : 1;
-        m.hp -= (BUILDINGS.GUN_TURRET.damage ?? 14) * weatherPenalty;
+        // Anti-POD weapon mode takes reduced damage from pods; Anti-MMR takes more from pods conceptually reversed for bunker→mech
+        let incoming = (spec.damage ?? 14) * weatherPenalty;
+        if (b.type === "GUN_POD" && m.weaponMode === "ANTI_POD") incoming *= 0.55;
+        if (b.type === "GUN_POD" && m.weaponMode === "ANTI_MMR") incoming *= 1.15;
+        m.hp -= incoming;
         // Tracer particle
         state.particles.push({
           id: uid("pa"),
@@ -892,7 +1010,7 @@ const tickMechs = (state: RuntimeState, dt: number) => {
           vy: (m.pos.y - bw.y) * 6,
           life: 0,
           maxLife: 0.12,
-          color: "#fde68a",
+          color: b.type === "GUN_POD" ? "#fca5a5" : "#fde68a",
           size: 1.5,
         });
       }
@@ -930,7 +1048,11 @@ const tickMechs = (state: RuntimeState, dt: number) => {
         const wdx = ww.x - m.pos.x;
         const wdy = ww.y - m.pos.y;
         const wd = Math.hypot(wdx, wdy);
-        const step = MECH_SPEED * (layer === "UNDERGROUND" ? TUNNEL_MOVE_MULTIPLIER : 1) * weatherSpeedMultiplier(state, m) * dt;
+        const step =
+          (m.tier === "GUNNER_II" ? MECH_SPEED_GUNNER_II : MECH_SPEED) *
+          (layer === "UNDERGROUND" ? TUNNEL_MOVE_MULTIPLIER : 1) *
+          weatherSpeedMultiplier(state, m) *
+          dt;
         if (wd <= step || wd < 1) {
           m.pos.x = ww.x;
           m.pos.y = ww.y;
@@ -948,7 +1070,15 @@ const tickMechs = (state: RuntimeState, dt: number) => {
       m.attackCooldown -= dt;
       if (m.attackCooldown <= 0) {
         m.attackCooldown = MECH_ATTACK_COOLDOWN;
-        target.hp -= MECH_DAMAGE;
+        let dmg = m.tier === "GUNNER_II" ? MECH_DAMAGE_GUNNER_II : MECH_DAMAGE;
+        if (target.type === "GUN_POD" || target.type === "GUN_TURRET") {
+          if (m.weaponMode === "ANTI_POD") dmg *= 1.5;
+          if (m.weaponMode === "ANTI_MMR") dmg *= 0.5;
+        } else if (target.type === "HQ" || target.type === "DUMMY_BASE") {
+          if (m.weaponMode === "ANTI_MMR") dmg *= 1.1;
+        }
+        // Mechs fighting enemy mechs — Anti-MMR bonus
+        target.hp -= dmg;
         state.particles.push({
           id: uid("pa"),
           side: target.side,
@@ -1018,12 +1148,12 @@ const tickShake = (state: RuntimeState, dt: number) => {
 };
 
 const checkWinLoss = (state: RuntimeState) => {
-  const playerHQ = state.buildings.find((b) => b.side === "PLAYER" && b.type === "HQ");
-  const enemyHQ = state.buildings.find((b) => b.side === "ENEMY" && b.type === "HQ");
-  if (!playerHQ || playerHQ.hp <= 0) {
+  const playerBases = state.buildings.filter((b) => b.side === "PLAYER" && b.type === "HQ" && b.hp > 0);
+  const enemyBases = state.buildings.filter((b) => b.side === "ENEMY" && b.type === "HQ" && b.hp > 0);
+  if (playerBases.length === 0) {
     state.status = "DEFEAT";
     sfx("defeat");
-  } else if (!enemyHQ || enemyHQ.hp <= 0) {
+  } else if (enemyBases.length === 0) {
     state.status = "VICTORY";
     sfx("victory");
   }
@@ -1035,28 +1165,25 @@ type AiAction =
   | { kind: "attack"; projectile: ProjectileType; target: Building; score: number; reason: string };
 
 const countBuildingsByType = (buildings: Building[], side: Owner): Record<BuildingType, number> => {
-  const counts: Record<BuildingType, number> = {
-    HQ: 0,
-    ENERGY_PLANT: 0,
-    SUPPLY_DEPOT: 0,
-    RADAR: 0,
-    RADAR_JAMMER: 0,
-    TUNNEL_ENTRANCE: 0,
-    SEISMIC_SENSOR: 0,
-    TERRAIN_DESTABILIZER: 0,
-    WEATHER_CONTROL: 0,
-    BIOSPHERE_ENGINE: 0,
-    MISSILE_LAUNCHER: 0,
-    EMP_CANNON: 0,
-    METAL_MARINE_BASE: 0,
-    AA_GUN: 0,
-    GUN_TURRET: 0,
-    LAND_MINE: 0,
-  };
+  const counts = {} as Record<BuildingType, number>;
+  for (const key of Object.keys(BUILDINGS) as BuildingType[]) counts[key] = 0;
   for (const b of buildings) {
     if (b.side === side && b.hp > 0) counts[b.type]++;
   }
   return counts;
+};
+
+/** Dummy Cover adjacent to a base conceals it from enemy radar memory. */
+const isConcealedByDummyCover = (state: RuntimeState, building: Building): boolean => {
+  if (building.type !== "HQ" && building.type !== "DUMMY_BASE") return false;
+  return state.buildings.some(
+    (c) =>
+      c.side === building.side &&
+      c.type === "DUMMY_COVER" &&
+      c.hp > 0 &&
+      Math.abs(c.pos.x - building.pos.x) <= 1 &&
+      Math.abs(c.pos.y - building.pos.y) <= 1
+  );
 };
 
 const updateAiMemory = (state: RuntimeState) => {
@@ -1066,7 +1193,12 @@ const updateAiMemory = (state: RuntimeState) => {
   );
   for (const b of state.buildings) {
     if (b.side !== "PLAYER" || b.hp <= 0) continue;
-    if (radarOnline || b.type === "HQ" || b.buildTimeRemaining <= 0) {
+    if (isConcealedByDummyCover(state, b)) {
+      delete memory.seenPlayerBuildings[b.id];
+      continue;
+    }
+    // Dummy bases are always attractive once seen
+    if (radarOnline || b.type === "HQ" || b.type === "DUMMY_BASE" || b.buildTimeRemaining <= 0) {
       memory.seenPlayerBuildings[b.id] = { type: b.type, pos: b.pos, lastSeenAt: state.elapsed };
     }
   }
@@ -1110,10 +1242,13 @@ const scoreAiActions = (
 
   addBuild("ENERGY_PLANT", 80 * eco - counts.ENERGY_PLANT * 18 + Math.max(0, 180 - state.enemyEnergy) * 0.12, "power-growth");
   addBuild("SUPPLY_DEPOT", 72 * eco - counts.SUPPLY_DEPOT * 16 + Math.max(0, 350 - state.enemyFunds) * 0.08, "funds-growth");
+  addBuild("FACTORY", counts.FACTORY ? 12 : 40 + eco * 20, "build-tempo");
   addBuild("AA_GUN", 48 + state.stats.missilesFired * 2 - counts.AA_GUN * 18, "anti-missile-screen");
   addBuild("MISSILE_LAUNCHER", counts.MISSILE_LAUNCHER ? 15 : 75 + agg * 20, "unlock-strikes");
+  addBuild("ICBM_SILO", counts.ICBM_SILO ? 8 : 30 + agg * 35, "strategic-icbm");
   addBuild("METAL_MARINE_BASE", counts.METAL_MARINE_BASE ? 8 : 52 + agg * 45 - playerAa * 4, "ground-assault");
   addBuild("GUN_TURRET", 32 + state.mechs.filter((m) => m.side === "ENEMY").length * 25 - counts.GUN_TURRET * 14, "base-defense");
+  addBuild("GUN_POD", 38 + state.mechs.filter((m) => m.side === "ENEMY").length * 20 - counts.GUN_POD * 12, "gun-pod-bunker");
   addBuild("RADAR", counts.RADAR ? 8 : 45 + Object.keys(memory.seenPlayerBuildings).length * 2, "target-intel");
   addBuild("RADAR_JAMMER", counts.RADAR_JAMMER ? 12 : 42 + playerAa * 9 + agg * 20, "jam-defense");
   addBuild("EMP_CANNON", counts.EMP_CANNON ? 10 : 48 + playerAa * 6 + (playerPower ? 12 : 0), "disable-grid");
@@ -1123,9 +1258,18 @@ const scoreAiActions = (
   addBuild("WEATHER_CONTROL", counts.WEATHER_CONTROL ? 9 : 34 + agg * 16 + playerAa * 4, "weather-control");
   addBuild("BIOSPHERE_ENGINE", counts.BIOSPHERE_ENGINE ? 10 : 28 + eco * 18, "eco-resilience");
 
+  const decoy = playerTargets.find((b) => b.type === "DUMMY_BASE");
+  const strikeTarget = decoy ?? hq;
+
   if (counts.MISSILE_LAUNCHER > 0) {
-    addAttack("DUMMY", hq, state.elapsed - memory.lastProbeAt > 20 ? 50 + playerAa * 12 : 12, "aa-probe");
-    addAttack("ICBM", hq, 44 + agg * 45 - memory.aaProbeScore * 12 - playerAa * 3, "hq-strike");
+    addAttack("DUMMY", strikeTarget, state.elapsed - memory.lastProbeAt > 20 ? 50 + playerAa * 12 : 12, "aa-probe");
+    const weakTarget = playerTargets
+      .filter((b) => b.type !== "HQ")
+      .sort((a, b) => a.hp - b.hp || a.pos.y - b.pos.y)[0];
+    addAttack("DUMMY", weakTarget, 28 + agg * 10, "harass-weak");
+  }
+  if (counts.ICBM_SILO > 0) {
+    addAttack("ICBM", strikeTarget, 44 + agg * 45 - memory.aaProbeScore * 12 - playerAa * 3, "hq-strike");
     const weakTarget = playerTargets
       .filter((b) => b.type !== "HQ")
       .sort((a, b) => a.hp - b.hp || a.pos.y - b.pos.y)[0];
@@ -1150,9 +1294,9 @@ const aiTick = (state: RuntimeState, mission: MissionDef, dt: number) => {
   ai.nextActionAt -= dt;
   if (ai.nextActionAt > 0) return;
 
-  // Update phase based on count and time
-  if (state.elapsed > 25 && ai.phase === "ECO") ai.phase = "ARMY";
-  if (state.elapsed > 60 && ai.phase === "ARMY") ai.phase = "ASSAULT";
+  // Update phase based on count and time — slowed so early missions are playable
+  if (state.elapsed > 40 && ai.phase === "ECO") ai.phase = "ARMY";
+  if (state.elapsed > 90 && ai.phase === "ARMY") ai.phase = "ASSAULT";
 
   const agg = mission.enemyAggression;
   const counts = countBuildingsByType(state.buildings, "ENEMY");
@@ -1177,9 +1321,9 @@ const aiTick = (state: RuntimeState, mission: MissionDef, dt: number) => {
     }
   }
 
-  // Schedule next action
-  const base = ai.phase === "ECO" ? 4.5 : ai.phase === "ARMY" ? 3.2 : 2.0;
-  ai.nextActionAt = base * rngRange(state, 0.7, 1.3) * (1.2 - agg * 0.4);
+  // Schedule next action — slower cadence so players can establish bases
+  const base = ai.phase === "ECO" ? 7.5 : ai.phase === "ARMY" ? 5.0 : 3.2;
+  ai.nextActionAt = base * rngRange(state, 0.75, 1.25) * (1.35 - agg * 0.35);
 
   // AI defensively launches AA when something inbound
   for (const p of state.projectiles) {
