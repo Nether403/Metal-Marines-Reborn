@@ -1,5 +1,6 @@
 import type { MissionDef } from "@/game/types";
 import { COMMANDERS } from "@/data/commanders";
+import { MISSIONS } from "@/data/missions";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ChevronRight, Shield, Skull } from "lucide-react";
 
@@ -14,6 +15,7 @@ export default function Briefing({
 }) {
   const cmd = COMMANDERS[mission.commanderId];
   const missionNum = String(mission.index).padStart(2, "0");
+  const missionTotal = String(MISSIONS.length).padStart(2, "0");
 
   return (
     <div
@@ -59,7 +61,7 @@ export default function Briefing({
             Pacific Fleet Command
           </span>
           <span style={{ color: "rgba(55,216,255,0.5)" }}>
-            MISSION {missionNum} / 06 &nbsp;·&nbsp; CLASSIFICATION: TOP SECRET
+            MISSION {missionNum} / {missionTotal} &nbsp;·&nbsp; CLASSIFICATION: TOP SECRET
           </span>
           <span className="flex items-center gap-1" style={{ color: "var(--hud-player)" }}>
             <AlertTriangle className="h-3 w-3" />

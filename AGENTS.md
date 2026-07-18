@@ -33,7 +33,7 @@ and record why in Memories.
 4. [x] Mech walk/fight frames: distinct poses from hero art (not rotate/tint of idle).
 
 #### P1 — Product polish
-5. [ ] HowToPlay + Mission 1 briefing refresh for Theater Command + new buildings.
+5. [x] HowToPlay + Mission 1 briefing refresh for Theater Command + new buildings.
 6. [ ] Build palette: category tabs or scroll polish so 20+ buildings don't feel
       like a wall of chips on short viewports.
 7. [ ] Enemy island: when fog lifts, enemy hero buildings must read gold/purple
