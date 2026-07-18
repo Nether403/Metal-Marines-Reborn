@@ -48,6 +48,7 @@ export interface Building {
   id: string;
   type: BuildingType;
   owner: Owner;
+  side: Owner;
   pos: Position;
   /** Top-left of multi-tile footprint (same as pos for 1×1). */
   footprintW: number;
