@@ -59,9 +59,9 @@ export default function EndScreen({
               NEXT: {nextMission.title}
             </Button>
           )}
-          <Link href="/missions">
+          <Link href="/campaign">
             <Button variant="outline" className="font-mono border-primary/40" onClick={() => end()}>
-              MISSION SELECT
+              THEATER COMMAND
             </Button>
           </Link>
           <Link href="/">

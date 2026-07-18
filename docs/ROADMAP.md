@@ -47,11 +47,13 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - Balance costs / AI so idle missions are not instant defeat
 - Determinism / regression checks (`test:game`, seeded init)
 
-### Phase 5 — Later
-- True isometric camera (optional)
-- Vehicles / aircraft
-- Meta-map / multiplayer / replay
-- Commissioned final art hot-swap into existing atlases
+### Phase 5 — Presentation layer (in progress)
+- [x] Campaign Theater meta-map (`/campaign`) with sector nodes + intel panel
+- [x] Art upgrade pass: identity-board palettes, isometric building blocks, HF hero HQ/mech overlays hot-swapped into atlases
+- [ ] Replace remaining procedural building cells with commissioned / AI hero sprites (Energy, Radar, Gun Pod, Factory next)
+- [ ] True isometric camera (optional)
+- [ ] Vehicles / aircraft
+- [ ] Multiplayer / replay foundation
 
 ## Validation commands
 

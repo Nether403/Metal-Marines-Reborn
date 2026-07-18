@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import MissionSelect from "@/pages/MissionSelect";
+import CampaignTheater from "@/pages/CampaignTheater";
 import Play from "@/pages/Play";
 import HowToPlay from "@/pages/HowToPlay";
 
@@ -14,6 +15,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/campaign" component={CampaignTheater} />
       <Route path="/missions" component={MissionSelect} />
       <Route path="/play/:missionId" component={Play} />
       <Route path="/how-to-play" component={HowToPlay} />

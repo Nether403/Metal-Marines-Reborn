@@ -21,20 +21,30 @@ export default function MissionSelect() {
         <header className="flex items-center justify-between border-b border-primary/20 pb-4">
           <div>
             <h1 className="text-3xl font-bold text-primary font-mono drop-shadow-[0_0_8px_rgba(0,255,128,0.5)]">
-              MISSION SELECT
+              MISSION LIST
             </h1>
             <p className="text-muted-foreground font-mono text-sm mt-1">
-              Six sectors. Six commanders. End the war.
+              Twenty operations. Prefer Theater Command for the campaign map.
             </p>
           </div>
-          <Link href="/">
-            <Button
-              variant="outline"
-              className="font-mono border-primary/30 text-primary hover:bg-primary/10"
-            >
-              RETURN
-            </Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/campaign">
+              <Button
+                variant="outline"
+                className="font-mono border-secondary/40 text-secondary hover:bg-secondary/10"
+              >
+                THEATER
+              </Button>
+            </Link>
+            <Link href="/">
+              <Button
+                variant="outline"
+                className="font-mono border-primary/30 text-primary hover:bg-primary/10"
+              >
+                RETURN
+              </Button>
+            </Link>
+          </div>
         </header>
 
         {snap && snapMission && (

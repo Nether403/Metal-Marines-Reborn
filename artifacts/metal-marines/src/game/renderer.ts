@@ -731,7 +731,8 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
   if (hidden) return;
   const { x: cx, y: cy } = tileToWorld(b.side, b.pos.x, b.pos.y);
   const spriteKey = buildingSpriteKey(b, now);
-  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: TILE_PX / 64 })) {
+  // Slight overscale so 64px atlas art reads clearly on the battlefield.
+  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: (TILE_PX / 64) * 1.28 })) {
     // Sprite rendered successfully; overlays below still show EMP/progress/HP.
   } else {
     drawProceduralBuilding(ctx, b, cx, cy, now);
@@ -1003,7 +1004,13 @@ const drawProceduralMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
 const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
   const spriteKey = mechSpriteKey(m, time);
   const underground = (m.layer ?? "SURFACE") === "UNDERGROUND";
-  if (spriteKey && spriteManager.draw(ctx, spriteKey, m.pos.x, m.pos.y, { scale: TILE_PX / 64, alpha: underground ? 0.62 : 1 })) {
+  if (
+    spriteKey &&
+    spriteManager.draw(ctx, spriteKey, m.pos.x, m.pos.y, {
+      scale: (TILE_PX / 64) * 1.35,
+      alpha: underground ? 0.62 : 1,
+    })
+  ) {
     return;
   }
   drawProceduralMech(ctx, m);
