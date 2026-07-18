@@ -970,82 +970,299 @@ def make_units(hero_player: Image.Image | None, hero_enemy: Image.Image | None):
     img.save(OUT / "units.png", optimize=True)
 
 
-def make_projectiles():
-    specs = [
-        ("icbm", 24, 48, (245, 245, 240, 255)),
-        ("emp", 32, 32, (120, 210, 255, 255)),
-        ("transport_pod", 32, 24, (196, 40, 40, 255)),
-        ("tunnel_buster", 24, 40, (250, 200, 60, 255)),
-        ("dummy", 20, 36, (148, 163, 184, 255)),
-        ("aa", 16, 28, (80, 200, 120, 255)),
+def _draw_missile_body(
+    d: ImageDraw.ImageDraw,
+    x: int,
+    cy: int,
+    w: int,
+    h: int,
+    body: tuple[int, int, int, int],
+    accent: tuple[int, int, int, int],
+    *,
+    fins: bool = True,
+    bands: int = 2,
+    nose_glow: tuple[int, int, int, int] = (251, 146, 60, 255),
+) -> None:
+    """Thick nose-up missile silhouette (atlas top = flight forward)."""
+    cx = x + w // 2
+    top = cy - h // 2 + 1
+    bot = cy + h // 2 - 1
+    half = max(5, w // 2 - 2)
+    # Outer hull — fat diamond/capsule so it reads at combat zoom
+    hull = [
+        (cx, top),
+        (cx + half, top + int(h * 0.22)),
+        (cx + half - 1, bot - 6),
+        (cx, bot),
+        (cx - half + 1, bot - 6),
+        (cx - half, top + int(h * 0.22)),
     ]
-    width = sum(s[1] for s in specs)
-    img = new_rgba(width, 48)
-    d = ImageDraw.Draw(img)
-    x = 0
-    for name, w, h, color in specs:
-        cy = 24
-        if name == "emp":
-            d.ellipse([x + 2, cy - h // 2 + 2, x + w - 2, cy + h // 2 - 2], outline=color, width=3)
-            d.ellipse([x + 8, cy - 6, x + w - 8, cy + 6], fill=(*color[:3], 120))
-        elif name == "transport_pod":
-            d.polygon(
-                [(x + 2, cy), (x + w // 2, cy - h // 2 + 2), (x + w - 2, cy), (x + w // 2, cy + h // 2 - 2)],
-                fill=color,
-                outline=(40, 40, 40, 255),
-            )
-            hazard_strip(d, x + 6, cy - 2, x + w - 6, cy + 2, PLAYER, 3)
-        else:
+    d.polygon(hull, fill=body, outline=(20, 22, 24, 255))
+    # Lit center strip (thickness cue)
+    strip_w = max(3, half // 2)
+    d.polygon(
+        [
+            (cx, top + 3),
+            (cx + strip_w, top + int(h * 0.28)),
+            (cx + strip_w - 1, bot - 10),
+            (cx - strip_w + 1, bot - 10),
+            (cx - strip_w, top + int(h * 0.28)),
+        ],
+        fill=shade(body, 1.35),
+    )
+    # Accent bands
+    for bi in range(bands):
+        by = top + int(h * (0.38 + bi * 0.16))
+        d.rectangle([cx - half + 2, by, cx + half - 2, by + 3], fill=accent)
+    # Nose glow / warhead tip
+    d.ellipse([cx - 4, top - 1, cx + 4, top + 9], fill=nose_glow)
+    d.ellipse([cx - 2, top + 1, cx + 2, top + 5], fill=(255, 250, 220, 240))
+    # Exhaust nozzle
+    d.rectangle([cx - 4, bot - 5, cx + 4, bot], fill=(30, 30, 34, 255))
+    d.ellipse([cx - 3, bot - 2, cx + 3, bot + 4], fill=(251, 146, 60, 200))
+    if fins:
+        fin_y = bot - int(h * 0.28)
+        for side in (-1, 1):
             d.polygon(
                 [
-                    (x + w // 2, cy - h // 2 + 2),
-                    (x + w - 2, cy + h // 2 - 4),
-                    (x + w // 2, cy + h // 2 - 2),
-                    (x + 2, cy + h // 2 - 4),
+                    (cx + side * (half - 1), fin_y),
+                    (cx + side * (half + 5), bot - 2),
+                    (cx + side * (half - 1), bot - 6),
                 ],
-                fill=color,
-                outline=(30, 30, 30, 255),
+                fill=shade(body, 0.7),
+                outline=(18, 18, 20, 255),
             )
-            d.ellipse(
-                [x + w // 2 - 3, cy - h // 2, x + w // 2 + 3, cy - h // 2 + 8],
-                fill=(251, 146, 60, 255),
+
+
+def _draw_transport_pod(d: ImageDraw.ImageDraw, x: int, cy: int, w: int, h: int) -> None:
+    """Capsule drop pod with visible mech silhouette in the hatch window."""
+    cx = x + w // 2
+    top = cy - h // 2 + 1
+    bot = cy + h // 2 - 1
+    half = max(8, w // 2 - 2)
+    # Heat shield nose
+    d.ellipse([cx - half + 2, top, cx + half - 2, top + 14], fill=(196, 40, 40, 255), outline=(40, 20, 20, 255))
+    d.ellipse([cx - half + 6, top + 3, cx + half - 6, top + 11], fill=(245, 120, 80, 220))
+    # Main capsule body
+    body_top = top + 10
+    body_bot = bot - 8
+    d.rounded_rectangle(
+        [cx - half, body_top, cx + half, body_bot],
+        radius=6,
+        fill=(55, 62, 70, 255),
+        outline=(22, 26, 28, 255),
+    )
+    # Side ribs
+    for ry in (body_top + 4, (body_top + body_bot) // 2, body_bot - 8):
+        d.rectangle([cx - half + 1, ry, cx + half - 1, ry + 2], fill=(90, 98, 108, 230))
+    # Hatch / viewport — mech reads through the glass
+    vw = half - 3
+    vh = max(14, (body_bot - body_top) // 2)
+    vx0, vy0 = cx - vw, body_top + 6
+    vx1, vy1 = cx + vw, body_top + 6 + vh
+    d.rounded_rectangle([vx0, vy0, vx1, vy1], radius=3, fill=(30, 50, 58, 240), outline=(160, 200, 210, 220))
+    # Chunk mech silhouette (helmet + torso + arms) inside the hatch
+    d.ellipse([cx - 5, vy0 + 2, cx + 5, vy0 + 10], fill=(110, 122, 72, 255))  # head
+    d.rectangle([cx - 6, vy0 + 9, cx + 6, vy0 + vh - 3], fill=(74, 84, 48, 255))  # torso
+    d.rectangle([cx - 10, vy0 + 11, cx - 6, vy0 + vh - 5], fill=(90, 98, 108, 255))  # L arm
+    d.rectangle([cx + 6, vy0 + 11, cx + 10, vy0 + vh - 5], fill=(90, 98, 108, 255))  # R arm
+    d.rectangle([cx - 3, vy0 + 4, cx + 3, vy0 + 7], fill=(160, 200, 210, 230))  # visor
+    # Hazard belt
+    hazard_strip(d, cx - half + 2, body_bot - 7, cx + half - 2, body_bot - 3, PLAYER, 4)
+    # Retros / thruster skirt
+    d.rectangle([cx - half + 2, body_bot - 1, cx + half - 2, bot - 2], fill=(40, 44, 48, 255))
+    for tx in (cx - 8, cx, cx + 8):
+        d.ellipse([tx - 3, bot - 5, tx + 3, bot + 2], fill=(251, 146, 60, 210))
+        d.ellipse([tx - 1, bot - 3, tx + 1, bot], fill=(254, 243, 199, 230))
+
+
+def _draw_emp_orb(d: ImageDraw.ImageDraw, x: int, cy: int, w: int, h: int) -> None:
+    cx = x + w // 2
+    r = min(w, h) // 2 - 2
+    cyan = (80, 210, 255, 255)
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=cyan, width=4)
+    d.ellipse([cx - r + 5, cy - r + 5, cx + r - 5, cy + r - 5], fill=(40, 120, 160, 90), outline=(120, 230, 255, 200))
+    # Inner core
+    d.ellipse([cx - 7, cy - 7, cx + 7, cy + 7], fill=(180, 250, 255, 180))
+    d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=(255, 255, 255, 230))
+    # Lightning bolts past the rim (silhouette)
+    bolts = [
+        [(cx - r - 1, cy - 4), (cx - r // 2, cy - 10), (cx - 2, cy - 2), (cx + 6, cy - 12)],
+        [(cx + r + 1, cy + 2), (cx + r // 2, cy + 8), (cx + 2, cy + 1), (cx - 4, cy + 10)],
+    ]
+    for pts in bolts:
+        d.line(pts, fill=(120, 240, 255, 230), width=2)
+
+
+def make_projectiles():
+    # Thicker cells than the old 16–24px missiles; nose-up layout for rotation.
+    # Uniform row height so manifest rects (y=0,h=56) match drawn content.
+    specs = [
+        ("icbm", 32),
+        ("emp", 40),
+        ("transport_pod", 40),
+        ("tunnel_buster", 28),
+        ("dummy", 26),
+        ("aa", 22),
+    ]
+    row_h = 56
+    width = sum(s[1] for s in specs)
+    img = new_rgba(width, row_h)
+    d = ImageDraw.Draw(img)
+    x = 0
+    for name, w in specs:
+        cy = row_h // 2
+        h = row_h - 2
+        if name == "emp":
+            _draw_emp_orb(d, x, cy, w, min(w, h))
+        elif name == "transport_pod":
+            _draw_transport_pod(d, x, cy, w, h)
+        elif name == "icbm":
+            _draw_missile_body(
+                d, x, cy, w, h,
+                body=(245, 245, 240, 255),
+                accent=(196, 40, 40, 255),
+                bands=3,
+                nose_glow=(255, 120, 60, 255),
+            )
+        elif name == "tunnel_buster":
+            _draw_missile_body(
+                d, x, cy, w, h,
+                body=(250, 200, 60, 255),
+                accent=(120, 70, 20, 255),
+                bands=2,
+                nose_glow=(255, 220, 80, 255),
+            )
+            # Drill tip accent
+            cx = x + w // 2
+            tip = cy - h // 2 + 1
+            d.polygon(
+                [(cx, tip - 2), (cx + 5, tip + 8), (cx - 5, tip + 8)],
+                fill=(80, 50, 20, 255),
+            )
+        elif name == "dummy":
+            _draw_missile_body(
+                d, x, cy, w, h,
+                body=(148, 163, 184, 255),
+                accent=(168, 85, 247, 255),
+                bands=1,
+                nose_glow=(200, 180, 255, 255),
+            )
+            # Dashed decoy outline
+            cx = x + w // 2
+            half = max(5, w // 2 - 2)
+            top = cy - h // 2 + 4
+            bot = cy + h // 2 - 8
+            for y0 in range(top, bot, 6):
+                d.line([(cx - half - 1, y0), (cx - half - 1, min(y0 + 3, bot))], fill=(216, 180, 254, 220), width=1)
+                d.line([(cx + half + 1, y0), (cx + half + 1, min(y0 + 3, bot))], fill=(216, 180, 254, 220), width=1)
+        else:  # aa
+            _draw_missile_body(
+                d, x, cy, w, h,
+                body=(80, 200, 120, 255),
+                accent=(245, 245, 240, 255),
+                bands=1,
+                fins=True,
+                nose_glow=(180, 255, 160, 255),
             )
         x += w
     img.save(OUT / "projectiles.png", optimize=True)
 
 
 def make_fx():
-    frame = 48
+    # 64px frames (was 48) — bigger blast readable at combat zoom.
+    frame = 64
     cols = 8
     img = new_rgba(frame * cols, frame * 3)
     d = ImageDraw.Draw(img)
+
+    # Row 0: explosion flipbook — flash → fireball → shockwave → ember fade
     for i in range(8):
-        cx, cy = i * frame + 24, 24
-        r = 5 + i * 3
-        alpha = max(50, 230 - i * 24)
-        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(251, 146, 60, alpha))
-        d.ellipse([cx - r // 2, cy - r // 2, cx + r // 2, cy + r // 2], fill=(254, 243, 199, alpha))
-        if i > 1:
-            for a in range(8):
-                ang = a * math.pi / 4 + i * 0.1
-                dx = int(math.cos(ang) * r)
-                dy = int(math.sin(ang) * r)
-                d.line([(cx, cy), (cx + dx, cy + dy)], fill=(239, 68, 68, alpha), width=2)
-    for i in range(6):
-        cx, cy = i * frame + 24, frame + 24
-        r = 7 + i * 2
-        d.ellipse([cx - r, cy - r - i, cx + r, cy + r - i], fill=(100, 116, 139, max(30, 170 - i * 22)))
+        cx, cy = i * frame + frame // 2, frame // 2
+        t = i / 7.0
+        # Outer shockwave ring (grows then fades)
+        ring_r = int(8 + t * 26)
+        ring_a = max(0, int(200 - t * 210))
+        if ring_a > 20:
+            d.ellipse(
+                [cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r],
+                outline=(255, 220, 160, ring_a),
+                width=max(1, 4 - i // 2),
+            )
+        # Fireball body
+        r = int(6 + t * 22)
+        a = max(40, 250 - i * 28)
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(239, 68, 68, a))
         d.ellipse(
-            [cx - r + 4, cy - r - 4 - i, cx + r - 2, cy + r - 6 - i],
-            fill=(71, 85, 105, max(20, 130 - i * 18)),
+            [cx - int(r * 0.72), cy - int(r * 0.72), cx + int(r * 0.72), cy + int(r * 0.72)],
+            fill=(251, 146, 60, min(255, a + 20)),
         )
+        core = max(2, int(r * (0.45 if i < 5 else 0.25)))
+        d.ellipse([cx - core, cy - core, cx + core, cy + core], fill=(254, 243, 199, min(255, a + 40)))
+        # Debris / spark rays
+        if 1 <= i <= 6:
+            for a_i in range(10):
+                ang = a_i * math.pi / 5 + i * 0.12
+                length = int(r * (0.85 + (a_i % 3) * 0.15))
+                dx = int(math.cos(ang) * length)
+                dy = int(math.sin(ang) * length)
+                col = (255, 200, 80, max(50, a - 30)) if a_i % 2 == 0 else (239, 68, 68, max(40, a - 40))
+                d.line([(cx, cy), (cx + dx, cy + dy)], fill=col, width=2 if i < 4 else 1)
+        # Late smoke wisps
+        if i >= 5:
+            for ox, oy, rr in ((-10, -8, 7), (12, -4, 6), (-4, 10, 8), (8, 8, 5)):
+                sa = max(20, 140 - (i - 5) * 40)
+                d.ellipse(
+                    [cx + ox - rr, cy + oy - rr, cx + ox + rr, cy + oy + rr],
+                    fill=(70, 78, 90, sa),
+                )
+
+    # Row 1: smoke — denser multi-puff columns
+    for i in range(6):
+        cx, cy = i * frame + frame // 2, frame + frame // 2
+        lift = i * 3
+        for j, (ox, oy, rr, a0) in enumerate(
+            (
+                (0, -lift, 10 + i * 2, 180),
+                (-8, -lift - 4, 8 + i, 140),
+                (9, -lift - 2, 7 + i, 130),
+                (-3, -lift - 10, 6 + i, 100),
+                (5, -lift - 14, 5 + i, 80),
+            )
+        ):
+            a = max(18, a0 - i * 22 - j * 8)
+            d.ellipse(
+                [cx + ox - rr, cy + oy - rr, cx + ox + rr, cy + oy + rr],
+                fill=(100, 116, 139, a),
+            )
+            d.ellipse(
+                [cx + ox - rr + 3, cy + oy - rr - 2, cx + ox + rr - 2, cy + oy + rr - 4],
+                fill=(71, 85, 105, max(12, a - 30)),
+            )
+
+    # Row 2: muzzle flash — thicker wedge + bloom
     for i in range(4):
-        cx, cy = i * frame + 24, frame * 2 + 24
-        d.ellipse([cx - 4 - i, cy - 3, cx + 8 + i * 2, cy + 3], fill=(254, 249, 195, 220 - i * 40))
+        cx, cy = i * frame + frame // 2, frame * 2 + frame // 2
+        bloom = 6 + i * 3
+        d.ellipse([cx - bloom, cy - bloom // 2, cx + bloom, cy + bloom // 2], fill=(254, 249, 195, 200 - i * 35))
+        d.ellipse([cx - 3, cy - 3, cx + 5 + i, cy + 3], fill=(255, 255, 255, 230 - i * 30))
+        reach = 16 + i * 5
         d.polygon(
-            [(cx - 2, cy), (cx + 14 + i * 3, cy - 4 - i), (cx + 14 + i * 3, cy + 4 + i)],
-            fill=(251, 191, 36, 200),
+            [(cx - 2, cy), (cx + reach, cy - 5 - i), (cx + reach, cy + 5 + i)],
+            fill=(251, 191, 36, 210 - i * 30),
         )
+        d.polygon(
+            [(cx, cy), (cx + reach - 4, cy - 2), (cx + reach - 4, cy + 2)],
+            fill=(255, 250, 220, 200),
+        )
+        # Side sparks
+        for sy in (-1, 1):
+            d.line(
+                [(cx + 4, cy), (cx + 10 + i * 2, cy + sy * (6 + i))],
+                fill=(239, 68, 68, 180 - i * 30),
+                width=2,
+            )
+
     img.save(OUT / "fx.png", optimize=True)
 
 

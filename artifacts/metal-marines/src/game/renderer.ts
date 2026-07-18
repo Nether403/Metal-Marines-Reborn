@@ -1131,6 +1131,7 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
   if (p.fx) {
     const frame = spriteManager.animationFrame(`fx.${p.fx}`, p.life * 1000);
+    // FX atlas frames are 64px (was 48); keep size/48 so blasts read larger at combat zoom.
     if (frame && spriteManager.draw(ctx, frame, p.pos.x, p.pos.y, { scale: p.size / 48, alpha: Math.max(0, 1 - p.life / p.maxLife) })) {
       return;
     }
