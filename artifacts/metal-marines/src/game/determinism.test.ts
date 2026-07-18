@@ -269,7 +269,10 @@ assert.ok(
   for (let t = 0; t < 50; t += 0.25) stepGame(state, mission, 0.25);
   const gunship = state.aircraft.find((a) => a.owner === "PLAYER" && a.hp > 0);
   assert.ok(gunship, "GUNSHIP doctrine should launch a player gunship");
-  assert.equal(gunship!.targetBuildingId, "enemy_energy", "ENERGY priority should lock onto the Energy Plant");
+  const locked = state.buildings.find((b) => b.id === gunship!.targetBuildingId);
+  assert.ok(locked, "gunship should lock a building target");
+  assert.equal(locked!.type, "ENERGY_PLANT", "ENERGY priority should lock onto an Energy Plant");
+  assert.equal(locked!.side, "ENEMY", "gunship should target the enemy island");
 }
 
 console.log("game determinism checks passed");
