@@ -30,7 +30,7 @@ and record why in Memories.
    just tint overlays) for HQ, Energy, Missile, Turret at minimum.
 3. [x] Projectile + FX atlas upgrade: thicker missiles, bigger explosion flipbooks,
       visible mech drop pods (battlefeel vs SNES remake).
-4. [ ] Mech walk/fight frames: distinct poses from hero art (not rotate/tint of idle).
+4. [x] Mech walk/fight frames: distinct poses from hero art (not rotate/tint of idle).
 
 #### P1 — Product polish
 5. [ ] HowToPlay + Mission 1 briefing refresh for Theater Command + new buildings.

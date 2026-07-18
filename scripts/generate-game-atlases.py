@@ -905,13 +905,175 @@ def make_buildings(
             icon.save(icon_dir / f"{building_type}.png", optimize=True)
 
 
-def mech_frame(palette, pose: str, jagged: bool = False) -> Image.Image:
+def _sample_rgba(px, w: int, h: int, x: float, y: float):
+    """Nearest-neighbor sample with transparent OOB."""
+    ix, iy = int(round(x)), int(round(y))
+    if ix < 0 or iy < 0 or ix >= w or iy >= h:
+        return (0, 0, 0, 0)
+    return px[ix, iy]
+
+
+def hero_mech_pose_frame(
+    idle: Image.Image,
+    pose: str,
+    palette,
+    *,
+    phase: int = 0,
+) -> Image.Image:
+    """Compose distinct walk/fight/board/dead poses from a fitted hero idle cell.
+
+    Rotate/tint of idle is not enough at combat zoom — limb mass must move.
+    Uses a continuous displacement field so silhouettes stay solid (no clear-holes).
+    """
+    if pose == "idle":
+        return idle.copy()
+
+    w, h = idle.size
+    bbox = _opaque_bbox(idle)
+    if bbox is None:
+        return idle.copy()
+    x0, y0, x1, y1 = bbox
+    bw, bh = max(1, x1 - x0), max(1, y1 - y0)
+    mid_x = x0 + bw // 2
+    leg_y = y0 + int(bh * 0.52)
+    src_px = idle.load()
+
+    if pose == "dead":
+        # Tip the hero onto its side — fallen silhouette, not an X-tint on idle.
+        fallen = idle.rotate(72, resample=Image.Resampling.BICUBIC, expand=True)
+        fallen = ImageEnhance.Brightness(fallen).enhance(0.70)
+        fallen = ImageEnhance.Color(fallen).enhance(0.72)
+        fallen.thumbnail((w - 2, max(10, int(h * 0.72))), Image.Resampling.LANCZOS)
+        out = new_rgba(w, h)
+        ox = (w - fallen.width) // 2
+        oy = h - fallen.height - 1
+        out.paste(fallen, (ox, oy), fallen)
+        d = ImageDraw.Draw(out)
+        for sx, sy, rr, a in (
+            (w // 2 - 6, h - 7, 4, 130),
+            (w // 2 + 5, h - 9, 5, 95),
+            (w // 2 - 1, h - 13, 3, 75),
+        ):
+            d.ellipse([sx - rr, sy - rr, sx + rr, sy + rr], fill=(55, 52, 48, a))
+        d.line([(3, h - 5), (w - 4, h - 3)], fill=(18, 16, 14, 210), width=2)
+        return out
+
+    if pose == "boarding":
+        # Crouch into drop-pod hatch: vertical squash + glow canopy.
+        compact = idle.resize((w, max(10, int(h * 0.78))), Image.Resampling.LANCZOS)
+        out = new_rgba(w, h)
+        out.paste(compact, (0, h - compact.height - 1), compact)
+        d = ImageDraw.Draw(out)
+        glow = palette.get("glow", (125, 211, 252, 210))
+        d.ellipse([x0 + 2, 0, x1 - 2, max(7, int(h * 0.18))], fill=(*glow[:3], 85))
+        d.arc([x0 + 3, 1, x1 - 3, max(8, int(h * 0.20))], 200, 340, fill=glow, width=2)
+        d.rectangle([mid_x - 4, 0, mid_x + 4, 3], fill=shade(palette["metal"], 1.05))
+        return out
+
+    # Continuous warp for walk / fight — sample source with limb displacements.
+    out = new_rgba(w, h)
+    out_px = out.load()
+
+    walk = pose in ("walking", "walking2")
+    fight = pose in ("fighting", "fighting2")
+    sign = 1 if pose in ("walking", "fighting") else -1
+    if phase:
+        sign = -sign
+    fire = pose == "fighting2" or (fight and phase == 1)
+
+    stride = max(3.5, bh / 8.0)
+    lean = max(2.0, bw / 14.0)
+    gun_reach = max(4.0, bw / 5.5) if fight else 0.0
+    gun_lift = max(2.5, bh / 11.0) if fire else (1.2 if fight else 0.0)
+    plant = max(2.5, bw / 9.0) if fight else 0.0
+
+    for y in range(h):
+        for x in range(w):
+            # Normalized position inside the opaque bbox
+            ny = (y - y0) / bh
+            nx = (x - x0) / bw
+            sx = float(x)
+            sy = float(y)
+
+            if walk:
+                if ny > 0.52:
+                    # Legs: left/right opposite vertical stride + slight outward plant
+                    side = -1.0 if x < mid_x else 1.0
+                    t = min(1.0, (ny - 0.52) / 0.48)
+                    # out[y]=src[y+d] moves mass upward when d>0
+                    sy += side * sign * stride * t
+                    sx -= side * lean * 0.55 * t
+                elif ny > 0.18:
+                    # Torso lean + arm swing
+                    t = (ny - 0.18) / 0.34
+                    sx -= sign * lean * (1.0 - t * 0.3)
+                    sy += (0.9 if sign > 0 else -0.9) * (1.0 - t)
+                    if x < mid_x:
+                        sx += sign * lean * 1.2
+                        sy -= sign * 1.4
+                    else:
+                        sx -= sign * lean * 1.0
+                        sy += sign * 1.1
+                else:
+                    # Head / vents nod with lean
+                    sx -= sign * lean * 0.55
+
+            elif fight:
+                if ny > 0.52:
+                    # Wider plant
+                    side = -1.0 if x < mid_x else 1.0
+                    t = min(1.0, (ny - 0.52) / 0.48)
+                    sx -= side * plant * t
+                    sy -= 1.0 * t
+                elif x < mid_x + bw * 0.15 and 0.12 < ny < 0.62:
+                    # Weapon arm extends outward (image-left): pull mass from the right
+                    t = 1.0 - abs(ny - 0.34) * 2.2
+                    t = max(0.0, min(1.0, t))
+                    sx += gun_reach * t
+                    sy += gun_lift * t
+                elif ny < 0.55:
+                    # Torso leans into the shot
+                    sx -= lean * 0.85
+                    sy -= 1.4 if fire else 0.7
+
+            out_px[x, y] = _sample_rgba(src_px, w, h, sx, sy)
+
+    d = ImageDraw.Draw(out)
+    if walk:
+        # Dust kick under the planted foot
+        plant_x = int(mid_x - sign * max(3, bw // 6))
+        dust_y = min(h - 2, y1)
+        for i, ox in enumerate((-3, 0, 3)):
+            rr = 2 + (i % 2)
+            d.ellipse(
+                [plant_x + ox - rr, dust_y - rr, plant_x + ox + rr, dust_y + 1],
+                fill=(90, 78, 55, 100 - i * 18),
+            )
+
+    if fight:
+        # Orange muzzle bloom (not faction glow) — bigger on the fire phase.
+        mx = max(1, x0 - (2 if fire else 0))
+        my = y0 + int(bh * 0.30)
+        rr = 5 if fire else 3
+        d.ellipse([mx - rr, my - rr, mx + rr, my + rr], fill=(255, 140, 40, 220))
+        if fire:
+            d.ellipse([mx - rr - 2, my - 2, mx + 2, my + 2], fill=(255, 240, 170, 235))
+            d.ellipse([mx - 2, my - rr - 2, mx + 2, my], fill=(255, 200, 70, 190))
+            d.rectangle([mx, my - 1, mx + 5, my + 1], fill=(255, 250, 220, 245))
+
+    return out
+
+
+def mech_frame(palette, pose: str, jagged: bool = False, phase: int = 0) -> Image.Image:
+    """Procedural fallback when hero art is missing — still distinct per pose."""
     img = new_rgba(40, 48)
     d = ImageDraw.Draw(img)
     leg_off = 0
-    if pose == "walking":
-        leg_off = 4
-    elif pose == "fighting":
+    if pose in ("walking", "walking2"):
+        leg_off = 5 if pose == "walking" else -5
+        if phase:
+            leg_off = -leg_off
+    elif pose in ("fighting", "fighting2"):
         leg_off = -2
     # feet
     d.rectangle([10, 40 + max(0, leg_off), 18, 45 + max(0, leg_off)], fill=palette["metal"])
@@ -933,40 +1095,43 @@ def mech_frame(palette, pose: str, jagged: bool = False) -> Image.Image:
         d.rectangle([15, 4, 25, 13], fill=palette["metal"], outline=palette["trim"])
         d.rectangle([17, 6, 23, 11], fill=palette["glass"])
     # arms / weapon
-    if pose == "fighting":
-        d.rectangle([28, 14, 38, 19], fill=palette["metal_lit"])
-        d.ellipse([34, 12, 40, 20], fill=palette["glow"])
+    if pose in ("fighting", "fighting2"):
+        reach = 38 if pose == "fighting2" else 36
+        d.rectangle([28, 12, reach, 18], fill=palette["metal_lit"])
+        glow_r = 5 if pose == "fighting2" else 3
+        d.ellipse([reach - 4, 10, reach + glow_r, 20], fill=palette["glow"])
+        if pose == "fighting2":
+            d.ellipse([reach - 1, 8, reach + 6, 15], fill=(255, 220, 120, 220))
     else:
-        d.rectangle([6, 16, 11, 26], fill=shade(palette["olive"], 0.85))
-        d.rectangle([29, 16, 34, 26], fill=shade(palette["olive"], 0.85))
+        swing = 0
+        if pose in ("walking", "walking2"):
+            swing = 2 if pose == "walking" else -2
+        d.rectangle([6, 16 + swing, 11, 26 + swing], fill=shade(palette["olive"], 0.85))
+        d.rectangle([29, 16 - swing, 34, 26 - swing], fill=shade(palette["olive"], 0.85))
     if pose == "dead":
         d.line([(6, 8), (34, 40)], fill=(15, 15, 20, 230), width=2)
+        d.ellipse([8, 36, 20, 44], fill=(40, 38, 36, 180))
     if pose == "boarding":
         d.rectangle([8, 1, 32, 8], fill=palette["glow"])
+        d.arc([6, 0, 34, 14], 200, 340, fill=palette["glow"], width=2)
     return img
 
 
 def make_units(hero_player: Image.Image | None, hero_enemy: Image.Image | None):
-    poses = ["idle", "walking", "fighting", "boarding", "dead"]
-    img = new_rgba(40 * 5, 48 * 2)
+    # walking2 / fighting2 give flipbooks distinct silhouettes (not idle↔tilt).
+    poses = ["idle", "walking", "walking2", "fighting", "fighting2", "boarding", "dead"]
+    cell_w, cell_h = 40, 48
+    img = new_rgba(cell_w * len(poses), cell_h * 2)
     heroes = [hero_player, hero_enemy]
     pals = [PLAYER, ENEMY]
     for oi, (pal, hero) in enumerate(zip(pals, heroes)):
+        idle_fit = fit_rgba(hero, cell_w, cell_h, pad=1) if hero is not None else None
         for pi, pose in enumerate(poses):
-            if hero is not None and pose == "idle":
-                frame = fit_rgba(hero, 40, 48, pad=1)
-            elif hero is not None and pose != "dead":
-                frame = fit_rgba(hero, 40, 48, pad=1)
-                if pose == "fighting":
-                    # Temporary until P0 #4 ships distinct fight poses.
-                    frame = ImageEnhance.Brightness(frame).enhance(0.85)
-                    fd = ImageDraw.Draw(frame)
-                    fd.line([(6, 10), (34, 38)], fill=(20, 20, 25, 160), width=1)
-                if pose == "walking":
-                    frame = frame.rotate(4 if oi == 0 else -4, resample=Image.Resampling.BICUBIC, expand=False)
+            if idle_fit is not None:
+                frame = hero_mech_pose_frame(idle_fit, pose, pal)
             else:
                 frame = mech_frame(pal, pose, jagged=(oi == 1))
-            img.paste(frame, (pi * 40, oi * 48), frame)
+            img.paste(frame, (pi * cell_w, oi * cell_h), frame)
     img.save(OUT / "units.png", optimize=True)
 
 
