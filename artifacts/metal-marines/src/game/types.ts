@@ -328,6 +328,8 @@ export interface RuntimeState {
     frame: number;
     /** Initial rng seed at mission start (for offline verify). */
     seed: number;
+    /** Fixed sim step used for live capture + offline verify. */
+    tickDt: number;
     commands: ReplayCommand[];
     hashes: ReplayFrameHash[];
   };

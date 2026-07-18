@@ -21,6 +21,31 @@ import type {
 
 export const REPLAY_HASH_INTERVAL = 60;
 export const DEFAULT_REPLAY_TICK_DT = 1 / 30;
+/** Cap sim steps per rAF frame so hitch catch-up cannot spiral. */
+export const MAX_FIXED_STEPS_PER_FRAME = 5;
+
+/**
+ * Fixed-timestep accumulator for live play. Returns how many sim steps to run
+ * this frame and the leftover accumulator (clamped after a max-step catch-up).
+ */
+export const advanceFixedStepAccumulator = (
+  accumulator: number,
+  wallDt: number,
+  tickDt: number = DEFAULT_REPLAY_TICK_DT,
+  maxSteps: number = MAX_FIXED_STEPS_PER_FRAME
+): { accumulator: number; steps: number } => {
+  const safeTick = tickDt > 0 ? tickDt : DEFAULT_REPLAY_TICK_DT;
+  let acc = accumulator + Math.max(0, wallDt);
+  let steps = 0;
+  while (acc >= safeTick && steps < maxSteps) {
+    acc -= safeTick;
+    steps++;
+  }
+  // After hitting the cap, keep at most one tick of remainder so we don't
+  // permanently run behind after a long hitch / tab backgrounding.
+  if (steps >= maxSteps) acc = Math.min(acc, safeTick);
+  return { accumulator: acc, steps };
+};
 
 const stableNumber = (value: number): number => Math.round(value * 1000) / 1000;
 
