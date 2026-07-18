@@ -152,4 +152,32 @@ assert.ok(
   "idle M2-like player HQ must survive 90s (opening grace)"
 );
 
+// --- Factory vehicles / aircraft gameplay ---
+{
+  const mission = idleMission("factory-units", 1, 0.1, 0.8);
+  const state = createMissionRuntime(mission);
+  // Place an active player Factory beside HQ
+  state.buildings.push({
+    id: "factory_test",
+    type: "FACTORY",
+    side: "PLAYER",
+    owner: "PLAYER",
+    pos: { x: 6, y: 5 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.FACTORY.maxHp,
+    maxHp: BUILDINGS.FACTORY.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  state.playerFunds = 2000;
+  state.playerEnergy = 800;
+  for (let t = 0; t < 20; t += 0.25) stepGame(state, mission, 0.25);
+  assert.ok(state.vehicles.some((v) => v.owner === "PLAYER" && v.hp > 0), "Factory should spawn a garrison APC");
+  assert.ok(state.aircraft.some((a) => a.owner === "PLAYER" && a.hp > 0), "Factory should launch a gunship");
+  const hashes = [hashRuntimeFrame(state), hashRuntimeFrame(state)];
+  assert.equal(hashes[0], hashes[1], "vehicle/aircraft state hashes stably");
+}
+
 console.log("game determinism checks passed");

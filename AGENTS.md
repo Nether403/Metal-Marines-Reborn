@@ -42,6 +42,7 @@ and record why in Memories.
 #### P2 — Later / optional
 8. [x] Sample-based SFX banks (launch / explode / land) hot-swapped behind `sfx()`.
 9. [x] Vehicles / aircraft sprites (gameplay can stub later).
+   Follow-up: Factory spawns garrison APCs + assault gunships (this PR).
 10. [ ] True isometric camera (large refactor — only after P0 feels solid).
 11. [ ] Multiplayer / replay foundation.
 

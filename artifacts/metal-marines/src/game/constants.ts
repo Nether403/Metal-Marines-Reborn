@@ -220,7 +220,8 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     costEnergy: 70,
     buildTime: 8,
     maxHp: 320,
-    description: "Each active Factory speeds construction and upgrades across your island.",
+    description:
+      "Speeds construction, fields garrison APCs, and launches gunship strafes against the enemy island.",
   },
   DUMMY_BASE: {
     type: "DUMMY_BASE",
@@ -290,6 +291,23 @@ export const MAX_ASSAULT_MECHS = 3;
 export const AA_BASE_HIT_CHANCE = 0.5;
 export const AA_RADAR_HIT_BONUS = 0.05;
 export const FACTORY_BUILD_SPEED_BONUS = 0.18;
+export const FACTORY_VEHICLE_INTERVAL = 16;
+export const FACTORY_AIRCRAFT_INTERVAL = 26;
+export const FACTORY_VEHICLE_COST = { funds: 90, energy: 20 };
+export const FACTORY_AIRCRAFT_COST = { funds: 140, energy: 55 };
+export const MAX_VEHICLES_PER_SIDE = 3;
+export const MAX_AIRCRAFT_PER_SIDE = 2;
+export const VEHICLE_HP = 140;
+export const VEHICLE_DAMAGE = 16;
+export const VEHICLE_SPEED = tileUnits(0.85);
+export const VEHICLE_ATTACK_RANGE = tileUnits(1.35);
+export const VEHICLE_ATTACK_COOLDOWN = 0.55;
+export const AIRCRAFT_HP = 95;
+export const AIRCRAFT_DAMAGE = 12;
+export const AIRCRAFT_SPEED = tileUnits(1.35);
+export const AIRCRAFT_ATTACK_RANGE = tileUnits(1.8);
+export const AIRCRAFT_ATTACK_COOLDOWN = 0.45;
+export const AIRCRAFT_AA_DAMAGE = 22;
 export const ICBM_DAMAGE = 280;
 export const ICBM_SPLASH = tileUnits(1.35);
 export const MECH_HP = 220;

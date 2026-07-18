@@ -8,7 +8,11 @@ import {
   DUST_STORM_MECH_SPEED_MULTIPLIER,
   EMP_DISABLE_SECONDS,
   EMP_SPLASH,
+  FACTORY_AIRCRAFT_COST,
+  FACTORY_AIRCRAFT_INTERVAL,
   FACTORY_BUILD_SPEED_BONUS,
+  FACTORY_VEHICLE_COST,
+  FACTORY_VEHICLE_INTERVAL,
   GRID_H,
   GRID_W,
   GUNNER_II_ENERGY_PREMIUM,
@@ -17,7 +21,9 @@ import {
   ICBM_SPLASH,
   ISLAND_PX_H,
   ISLAND_PX_W,
+  MAX_AIRCRAFT_PER_SIDE,
   MAX_ASSAULT_MECHS,
+  MAX_VEHICLES_PER_SIDE,
   MECH_ATTACK_COOLDOWN,
   MECH_DAMAGE,
   MECH_DAMAGE_GUNNER_II,
@@ -25,6 +31,17 @@ import {
   MECH_HP_GUNNER_II,
   MECH_SPEED,
   MECH_SPEED_GUNNER_II,
+  AIRCRAFT_AA_DAMAGE,
+  AIRCRAFT_ATTACK_COOLDOWN,
+  AIRCRAFT_ATTACK_RANGE,
+  AIRCRAFT_DAMAGE,
+  AIRCRAFT_HP,
+  AIRCRAFT_SPEED,
+  VEHICLE_ATTACK_COOLDOWN,
+  VEHICLE_ATTACK_RANGE,
+  VEHICLE_DAMAGE,
+  VEHICLE_HP,
+  VEHICLE_SPEED,
   JAMMER_FALSE_SIGNATURE_INTERVAL,
   SEISMIC_DETECTION_SECONDS,
   SEISMIC_SENSOR_RANGE,
@@ -46,6 +63,7 @@ import { getBuildingCost } from "./economy";
 import { findPathToAdjacentBuilding, isPathableTile } from "./pathfinding";
 import { randomFloatFromSeed, randomIntFromSeed, randomRangeFromSeed } from "./rng";
 import type {
+  Aircraft,
   Building,
   BuildingType,
   Mech,
@@ -60,6 +78,7 @@ import type {
   TerrainMutation,
   Tile,
   TileLayer,
+  Vehicle,
   WeatherType,
 } from "./types";
 import { sfx } from "../lib/sfx";
@@ -495,6 +514,22 @@ export const explodeAt = (
     const d = distance(m.pos.x, m.pos.y, wx, wy);
     if (d <= splashRadius) {
       m.hp -= damage * 0.5;
+    }
+  }
+  for (const v of state.vehicles) {
+    if (v.side !== side || v.state === "DEAD") continue;
+    const d = distance(v.pos.x, v.pos.y, wx, wy);
+    if (d <= splashRadius) {
+      v.hp -= damage * 0.45;
+    }
+  }
+  for (const a of state.aircraft) {
+    if (a.state === "DEAD") continue;
+    // Any gunship over the strike island takes light splash
+    if (!inIsland(side, a.pos.x, a.pos.y)) continue;
+    const d = distance(a.pos.x, a.pos.y, wx, wy);
+    if (d <= splashRadius * 1.25) {
+      a.hp -= damage * 0.35;
     }
   }
   spawnExplosion(state, side, wx, wy, big);
@@ -1100,6 +1135,295 @@ const tickMechs = (state: RuntimeState, dt: number) => {
   }
 };
 
+const islandSideAt = (wx: number, wy: number): Owner | null => {
+  if (inIsland("PLAYER", wx, wy)) return "PLAYER";
+  if (inIsland("ENEMY", wx, wy)) return "ENEMY";
+  return null;
+};
+
+const spendSideResources = (
+  state: RuntimeState,
+  side: Owner,
+  funds: number,
+  energy: number
+): boolean => {
+  if (side === "PLAYER") {
+    if (state.playerFunds < funds || state.playerEnergy < energy) return false;
+    state.playerFunds -= funds;
+    state.playerEnergy -= energy;
+    return true;
+  }
+  if (state.enemyFunds < funds || state.enemyEnergy < energy) return false;
+  state.enemyFunds -= funds;
+  state.enemyEnergy -= energy;
+  return true;
+};
+
+const countLiveVehicles = (state: RuntimeState, owner: Owner) =>
+  state.vehicles.filter((v) => v.owner === owner && v.state !== "DEAD").length;
+
+const countLiveAircraft = (state: RuntimeState, owner: Owner) =>
+  state.aircraft.filter((a) => a.owner === owner && a.state !== "DEAD").length;
+
+const spawnVehicleAtFactory = (state: RuntimeState, factory: Building) => {
+  const wp = tileToWorld(factory.side, factory.pos.x, factory.pos.y);
+  state.vehicles.push({
+    id: uid("v"),
+    owner: factory.side,
+    side: factory.side,
+    pos: { x: wp.x + 10, y: wp.y + 8 },
+    hp: VEHICLE_HP,
+    maxHp: VEHICLE_HP,
+    state: "IDLE",
+    facing: factory.side === "PLAYER" ? 0 : Math.PI,
+    attackCooldown: 0.2,
+  });
+  sfx("land");
+};
+
+const spawnAircraftFromFactory = (state: RuntimeState, factory: Building) => {
+  const home = tileToWorld(factory.side, factory.pos.x, factory.pos.y);
+  const enemySide: Owner = factory.side === "PLAYER" ? "ENEMY" : "PLAYER";
+  const targets = state.buildings.filter((b) => b.side === enemySide && b.hp > 0);
+  const hq = targets.find((b) => b.type === "HQ") ?? targets[0];
+  const aim = hq
+    ? tileToWorld(hq.side, hq.pos.x, hq.pos.y)
+    : {
+        x: islandOriginX(enemySide) + ISLAND_PX_W / 2,
+        y: ISLAND_PX_H / 2,
+      };
+  state.aircraft.push({
+    id: uid("ac"),
+    owner: factory.side,
+    side: factory.side,
+    pos: { x: home.x, y: home.y - 12 },
+    hp: AIRCRAFT_HP,
+    maxHp: AIRCRAFT_HP,
+    state: "FLYING",
+    facing: Math.atan2(aim.y - home.y, aim.x - home.x),
+    attackCooldown: 0.4,
+    targetBuildingId: hq?.id,
+  });
+  sfx("launch");
+};
+
+/** Factories field garrison APCs and (after attack grace for AI) launch gunships. */
+const tickFactories = (state: RuntimeState, mission: MissionDef, dt: number) => {
+  void dt;
+  const enemyGrace = aiAttackGraceSeconds(mission.difficulty);
+  for (const factory of state.buildings) {
+    if (factory.type !== "FACTORY" || factory.hp <= 0) continue;
+    if (!isBuildingActive(factory, state.elapsed) || factory.cooldown > 0) continue;
+
+    const owner = factory.side;
+    const vehicles = countLiveVehicles(state, owner);
+    const aircraft = countLiveAircraft(state, owner);
+    const invaders = state.mechs.filter((m) => m.side === owner && m.owner !== owner && m.hp > 0).length;
+    // Enemy gunships wait for attack grace + ASSAULT so idle openings stay teachable.
+    const canAssault =
+      owner === "PLAYER" ||
+      (state.elapsed >= enemyGrace && state.aiState.phase === "ASSAULT");
+
+    // Prefer defenders when invaders are present or garrison is empty.
+    const wantVehicle =
+      vehicles < MAX_VEHICLES_PER_SIDE &&
+      (invaders > 0 || vehicles < 1 || (aircraft >= MAX_AIRCRAFT_PER_SIDE && vehicles < MAX_VEHICLES_PER_SIDE));
+    const wantAircraft =
+      canAssault &&
+      aircraft < MAX_AIRCRAFT_PER_SIDE &&
+      (!wantVehicle || (invaders === 0 && vehicles >= 1));
+
+    if (wantVehicle && spendSideResources(state, owner, FACTORY_VEHICLE_COST.funds, FACTORY_VEHICLE_COST.energy)) {
+      spawnVehicleAtFactory(state, factory);
+      factory.cooldown = FACTORY_VEHICLE_INTERVAL;
+      continue;
+    }
+    if (wantAircraft && spendSideResources(state, owner, FACTORY_AIRCRAFT_COST.funds, FACTORY_AIRCRAFT_COST.energy)) {
+      spawnAircraftFromFactory(state, factory);
+      factory.cooldown = FACTORY_AIRCRAFT_INTERVAL;
+      continue;
+    }
+    // Retry soon if broke or capped
+    factory.cooldown = 4;
+  }
+};
+
+const tickVehicles = (state: RuntimeState, dt: number) => {
+  for (let i = state.vehicles.length - 1; i >= 0; i--) {
+    const v = state.vehicles[i];
+    if (v.hp <= 0) {
+      spawnExplosion(state, v.side, v.pos.x, v.pos.y, false);
+      state.vehicles.splice(i, 1);
+      continue;
+    }
+
+    // Gun turrets / pods are island defenses — they already shred mechs in tickMechs.
+    // Mechs claw back at garrison APCs in contact range (continuous DPS).
+    for (const m of state.mechs) {
+      if (m.side !== v.side || m.owner === v.owner || m.hp <= 0) continue;
+      if ((m.layer ?? "SURFACE") === "UNDERGROUND") continue;
+      const md = distance(m.pos.x, m.pos.y, v.pos.x, v.pos.y);
+      if (md <= VEHICLE_ATTACK_RANGE * 1.05) {
+        const dps = (m.tier === "GUNNER_II" ? MECH_DAMAGE_GUNNER_II : MECH_DAMAGE) * 0.55;
+        v.hp -= dps * dt;
+      }
+    }
+
+    // Hunt enemy mechs on this island
+    let target: Mech | undefined;
+    if (v.targetMechId) {
+      target = state.mechs.find((m) => m.id === v.targetMechId && m.hp > 0);
+    }
+    if (!target) {
+      let best = Infinity;
+      for (const m of state.mechs) {
+        if (m.side !== v.side || m.owner === v.owner || m.hp <= 0) continue;
+        if ((m.layer ?? "SURFACE") === "UNDERGROUND" && (m.detectedUntil ?? 0) <= state.elapsed) continue;
+        const d = distance(m.pos.x, m.pos.y, v.pos.x, v.pos.y);
+        if (d < best) {
+          best = d;
+          target = m;
+        }
+      }
+      v.targetMechId = target?.id;
+    }
+
+    if (!target) {
+      v.state = "IDLE";
+      continue;
+    }
+
+    const dx = target.pos.x - v.pos.x;
+    const dy = target.pos.y - v.pos.y;
+    const d = Math.hypot(dx, dy);
+    v.facing = Math.atan2(dy, dx);
+    if (d > VEHICLE_ATTACK_RANGE) {
+      v.state = "MOVING";
+      const step = VEHICLE_SPEED * dt;
+      v.pos.x += (dx / d) * step;
+      v.pos.y += (dy / d) * step;
+    } else {
+      v.state = "IDLE";
+      v.attackCooldown -= dt;
+      if (v.attackCooldown <= 0) {
+        v.attackCooldown = VEHICLE_ATTACK_COOLDOWN;
+        target.hp -= VEHICLE_DAMAGE;
+        state.particles.push({
+          id: uid("pa"),
+          side: v.side,
+          pos: { x: v.pos.x, y: v.pos.y },
+          vx: (target.pos.x - v.pos.x) * 5,
+          vy: (target.pos.y - v.pos.y) * 5,
+          life: 0,
+          maxLife: 0.14,
+          color: "#fca5a5",
+          size: 1.8,
+          fx: "muzzle",
+        });
+      }
+    }
+  }
+};
+
+const tickAircraft = (state: RuntimeState, dt: number) => {
+  for (let i = state.aircraft.length - 1; i >= 0; i--) {
+    const a = state.aircraft[i];
+    if (a.hp <= 0) {
+      spawnExplosion(state, islandSideAt(a.pos.x, a.pos.y) ?? a.side, a.pos.x, a.pos.y, false);
+      state.aircraft.splice(i, 1);
+      continue;
+    }
+
+    a.state = "FLYING";
+    const over = islandSideAt(a.pos.x, a.pos.y);
+    if (over) a.side = over;
+
+    // AA batteries on the island under the gunship engage hostile craft
+    if (over && over !== a.owner) {
+      for (const b of state.buildings) {
+        if (b.side !== over || b.type !== "AA_GUN" || b.hp <= 0) continue;
+        if (!isBuildingActive(b, state.elapsed) || b.cooldown > 0) continue;
+        const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
+        const r = BUILDINGS.AA_GUN.range ?? 220;
+        if (distance(bw.x, bw.y, a.pos.x, a.pos.y) <= r) {
+          b.cooldown = 1 / (BUILDINGS.AA_GUN.fireRate ?? 1.2);
+          a.hp -= AIRCRAFT_AA_DAMAGE;
+          state.particles.push({
+            id: uid("pa"),
+            side: b.side,
+            pos: { x: bw.x, y: bw.y },
+            vx: (a.pos.x - bw.x) * 8,
+            vy: (a.pos.y - bw.y) * 8,
+            life: 0,
+            maxLife: 0.1,
+            color: "#7dd3fc",
+            size: 1.2,
+          });
+          break;
+        }
+      }
+    }
+
+    const enemySide: Owner = a.owner === "PLAYER" ? "ENEMY" : "PLAYER";
+    let target = a.targetBuildingId
+      ? state.buildings.find((b) => b.id === a.targetBuildingId && b.hp > 0)
+      : undefined;
+    if (!target) {
+      let best = Infinity;
+      for (const b of state.buildings) {
+        if (b.side !== enemySide || b.hp <= 0 || b.type === "LAND_MINE") continue;
+        const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
+        const d = distance(bw.x, bw.y, a.pos.x, a.pos.y);
+        const weighted = d + (b.type === "HQ" ? -40 : b.type === "AA_GUN" ? -20 : 0);
+        if (weighted < best) {
+          best = weighted;
+          target = b;
+        }
+      }
+      a.targetBuildingId = target?.id;
+    }
+
+    if (!target) continue;
+    const tw = tileToWorld(target.side, target.pos.x, target.pos.y);
+    const dx = tw.x - a.pos.x;
+    const dy = tw.y - a.pos.y;
+    const d = Math.hypot(dx, dy);
+    a.facing = Math.atan2(dy, dx);
+    if (d > AIRCRAFT_ATTACK_RANGE) {
+      const step = AIRCRAFT_SPEED * dt;
+      a.pos.x += (dx / d) * step;
+      a.pos.y += (dy / d) * step;
+    } else {
+      // Strafe circle — drift sideways while firing
+      const step = AIRCRAFT_SPEED * 0.55 * dt;
+      a.pos.x += (-dy / Math.max(d, 1)) * step;
+      a.pos.y += (dx / Math.max(d, 1)) * step;
+      a.attackCooldown -= dt;
+      if (a.attackCooldown <= 0) {
+        a.attackCooldown = AIRCRAFT_ATTACK_COOLDOWN;
+        target.hp -= AIRCRAFT_DAMAGE;
+        state.particles.push({
+          id: uid("pa"),
+          side: target.side,
+          pos: { x: a.pos.x, y: a.pos.y },
+          vx: (tw.x - a.pos.x) * 6,
+          vy: (tw.y - a.pos.y) * 6,
+          life: 0,
+          maxLife: 0.16,
+          color: "#fbbf24",
+          size: 2,
+          fx: "muzzle",
+        });
+        if (target.hp <= 0) {
+          spawnExplosion(state, target.side, tw.x, tw.y, true);
+          if (target.side === "PLAYER") state.stats.buildingsLost++;
+          else state.stats.buildingsDestroyed++;
+        }
+      }
+    }
+  }
+};
+
 const tickSeismicSensors = (state: RuntimeState) => {
   const sensors = state.buildings.filter(
     (b) => b.type === "SEISMIC_SENSOR" && isBuildingActive(b, state.elapsed)
@@ -1408,6 +1732,9 @@ export const stepGame = (state: RuntimeState, mission: MissionDef, dt: number) =
   tickProjectiles(state, dt);
   tickSeismicSensors(state);
   tickMechs(state, dt);
+  tickFactories(state, mission, dt);
+  tickVehicles(state, dt);
+  tickAircraft(state, dt);
   tickParticles(state, dt);
   tickShake(state, dt);
   tickAlerts(state, dt);
