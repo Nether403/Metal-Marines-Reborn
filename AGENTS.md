@@ -34,7 +34,7 @@ and record why in Memories.
 
 #### P1 — Product polish
 5. [x] HowToPlay + Mission 1 briefing refresh for Theater Command + new buildings.
-6. [ ] Build palette: category tabs or scroll polish so 20+ buildings don't feel
+6. [x] Build palette: category tabs or scroll polish so 20+ buildings don't feel
       like a wall of chips on short viewports.
 7. [ ] Enemy island: when fog lifts, enemy hero buildings must read gold/purple
       clearly (verify recolor quality at combat scale).

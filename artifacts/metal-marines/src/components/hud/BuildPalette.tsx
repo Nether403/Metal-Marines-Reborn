@@ -3,8 +3,8 @@ import { formatCostPressure, getBuildingCost } from "@/game/economy";
 import type { BuildingType, ProjectileType, RuntimeState } from "@/game/types";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/utils";
-import { Crosshair, Hammer, Radio, Rocket, Shield, Skull, Zap } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { Crosshair, Hammer, LayoutGrid, Radio, Rocket, Shield, Skull, Zap } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 const buildOrder: BuildingType[] = [
   "HQ",
@@ -57,6 +57,7 @@ const buildCategory: Record<BuildingType, "BASE" | "INTEL" | "WEAPONS" | "ECOLOG
 };
 
 type Category = "BASE" | "INTEL" | "WEAPONS" | "ECOLOGY";
+type FilterTab = "ALL" | Category;
 
 const categoryMeta: Record<Category, { label: string; color: string; glow: string; Icon: React.FC<{ className?: string }> }> = {
   BASE:    { label: "Base",    color: "rgba(55,216,255,0.8)",  glow: "rgba(55,216,255,0.2)",  Icon: Hammer },
@@ -64,6 +65,14 @@ const categoryMeta: Record<Category, { label: string; color: string; glow: strin
   WEAPONS: { label: "Weapons",color: "rgba(240,76,76,0.85)",  glow: "rgba(240,76,76,0.2)",   Icon: Shield },
   ECOLOGY: { label: "Eco",    color: "rgba(132,204,22,0.8)",  glow: "rgba(132,204,22,0.15)", Icon: Zap    },
 };
+
+const filterTabs: { id: FilterTab; label: string; color: string; Icon: React.FC<{ className?: string }> }[] = [
+  { id: "ALL", label: "All", color: "rgba(148,163,184,0.85)", Icon: LayoutGrid },
+  { id: "BASE", label: "Base", color: categoryMeta.BASE.color, Icon: categoryMeta.BASE.Icon },
+  { id: "INTEL", label: "Intel", color: categoryMeta.INTEL.color, Icon: categoryMeta.INTEL.Icon },
+  { id: "WEAPONS", label: "Weapons", color: categoryMeta.WEAPONS.color, Icon: categoryMeta.WEAPONS.Icon },
+  { id: "ECOLOGY", label: "Eco", color: categoryMeta.ECOLOGY.color, Icon: categoryMeta.ECOLOGY.Icon },
+];
 
 const shortName = (name: string) =>
   name
@@ -85,6 +94,14 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
   const selectWeapon = useGame((s) => s.selectWeapon);
   const selectMechWeapon = useGame((s) => s.selectMechWeapon);
   const selectMechTier = useGame((s) => s.selectMechTier);
+  const [filter, setFilter] = useState<FilterTab>("BASE");
+
+  // Hotkeys can select a building outside the active tab — follow the selection.
+  useEffect(() => {
+    if (!state.selectedBuild) return;
+    const cat = buildCategory[state.selectedBuild];
+    setFilter((prev) => (prev === "ALL" || prev === cat ? prev : cat));
+  }, [state.selectedBuild]);
 
   const canAfford = (f: number, e: number) => state.playerFunds >= f && state.playerEnergy >= e;
   const hasLauncher = state.buildings.some(
@@ -107,88 +124,143 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
     return hasLauncher;
   }).length;
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<FilterTab, number> = {
+      ALL: buildOrder.length,
+      BASE: 0,
+      INTEL: 0,
+      WEAPONS: 0,
+      ECOLOGY: 0,
+    };
+    for (const t of buildOrder) counts[buildCategory[t]] += 1;
+    return counts;
+  }, []);
+
+  const visibleBuilds = useMemo(
+    () => (filter === "ALL" ? buildOrder : buildOrder.filter((t) => buildCategory[t] === filter)),
+    [filter]
+  );
+
+  const baseUrl = import.meta.env.BASE_URL.endsWith("/")
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`;
+
   return (
     <div
-      className="mm-panel border-x-0 border-b-0 font-mono"
+      className="mm-panel shrink-0 border-x-0 border-b-0 font-mono"
       style={{ background: "linear-gradient(180deg,rgba(11,20,32,0.98),rgba(5,9,19,0.97))" }}
     >
       {/* Top separator */}
       <div className="h-px w-full" style={{ background: "linear-gradient(90deg,transparent,rgba(55,216,255,0.22) 50%,transparent)" }} />
 
-      <div className="grid grid-cols-[1.7fr_1fr] gap-2 p-2">
+      <div className="grid grid-cols-1 gap-2 p-2 sm:grid-cols-[1.7fr_1fr]">
 
         {/* ── BUILD CONTROL ── */}
         <div className="min-w-0">
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-1.5 flex flex-wrap items-end justify-between gap-2">
             <div>
               <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: "rgba(55,216,255,0.65)" }}>BUILD CONTROL</div>
-              <div className="text-[11px] font-black tracking-[0.06em]" style={{ color: "rgba(226,232,240,0.9)" }}>INFRASTRUCTURE / DEFENSES / SYSTEMS</div>
+              <div className="text-[11px] font-black tracking-[0.06em]" style={{ color: "rgba(226,232,240,0.9)" }}>
+                {filter === "ALL" ? "ALL SYSTEMS" : `${categoryMeta[filter].label.toUpperCase()} SYSTEMS`}
+              </div>
             </div>
-            {/* Category legend */}
-            <div className="hidden gap-1 lg:flex">
-              {(["BASE", "INTEL", "WEAPONS", "ECOLOGY"] as const).map((cat) => {
-                const { label, color, Icon } = categoryMeta[cat];
-                return (
-                  <span
-                    key={cat}
-                    className="flex items-center gap-0.5 px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
-                    style={{
-                      border: `1px solid ${color}40`,
-                      background: `${color}12`,
-                      color,
-                      clipPath: "polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px)",
-                    }}
-                  >
-                    <Icon className="h-2.5 w-2.5" /> {label}
-                  </span>
-                );
-              })}
+            <div className="text-[8px] uppercase tracking-widest" style={{ color: "rgba(100,116,139,0.65)" }}>
+              {visibleBuilds.length}/{buildOrder.length} shown
             </div>
           </div>
 
-          <div className="grid grid-cols-5 gap-1 xl:grid-cols-8">
-            {buildOrder.map((t) => {
-              const spec = BUILDINGS[t];
-              const cost = getBuildingCost(state.buildings, "PLAYER", t);
-              const sel = state.selectedBuild === t;
-              const ok = canAfford(cost.funds, cost.energy);
-              const cat = buildCategory[t];
-              const meta = categoryMeta[cat];
-              const Icon = meta.Icon;
-              const base = import.meta.env.BASE_URL.endsWith("/")
-                ? import.meta.env.BASE_URL
-                : `${import.meta.env.BASE_URL}/`;
-              const iconSrc = `${base}game-assets/icons/${t}.png`;
-
+          {/* Category filter tabs — always visible (not lg-only legend) */}
+          <div
+            className="mb-1.5 flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            role="tablist"
+            aria-label="Build categories"
+          >
+            {filterTabs.map((tab) => {
+              const active = filter === tab.id;
+              const count = categoryCounts[tab.id];
+              const Icon = tab.Icon;
               return (
-                <BuildButton
-                  key={t}
-                  selected={sel}
-                  affordable={ok}
-                  onClick={() => selectBuild(sel ? null : t)}
-                  title={formatCostPressure(state.buildings, "PLAYER", t)}
-                  hotkey={spec.hotkey}
-                  iconSrc={iconSrc}
-                  fallbackIcon={<Icon className="h-3 w-3" />}
-                  name={shortName(spec.name)}
-                  costLabel={`$${cost.funds}${cost.energy ? ` · ${cost.energy}E` : ""}`}
-                  accentColor={sel ? "var(--hud-energy)" : meta.color}
-                  selectionColor="var(--hud-energy)"
-                />
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setFilter(tab.id)}
+                  className="flex shrink-0 items-center gap-1 px-2 py-1 text-[8px] uppercase tracking-wider transition-colors"
+                  style={{
+                    border: `1px solid ${active ? tab.color : `${tab.color}40`}`,
+                    background: active ? `${tab.color}22` : `${tab.color}0a`,
+                    color: active ? tab.color : "rgba(148,163,184,0.85)",
+                    boxShadow: active ? `0 0 10px ${tab.color}28` : "none",
+                    clipPath: "polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px)",
+                  }}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  <span>{tab.label}</span>
+                  <span
+                    className="ml-0.5 min-w-[1rem] text-center text-[7px] font-black"
+                    style={{ color: active ? tab.color : "rgba(100,116,139,0.8)" }}
+                  >
+                    {count}
+                  </span>
+                </button>
               );
             })}
+          </div>
+
+          {/* Scrollable chip grid — caps height on short viewports */}
+          <div
+            className="max-h-[min(28vh,168px)] overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-color:rgba(55,216,255,0.35)_transparent] [scrollbar-width:thin]"
+            role="tabpanel"
+          >
+            <div
+              className={cn(
+                "grid gap-1",
+                filter === "ALL"
+                  ? "grid-cols-4 sm:grid-cols-5 xl:grid-cols-7"
+                  : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6"
+              )}
+            >
+              {visibleBuilds.map((t) => {
+                const spec = BUILDINGS[t];
+                const cost = getBuildingCost(state.buildings, "PLAYER", t);
+                const sel = state.selectedBuild === t;
+                const ok = canAfford(cost.funds, cost.energy);
+                const cat = buildCategory[t];
+                const meta = categoryMeta[cat];
+                const Icon = meta.Icon;
+                const iconSrc = `${baseUrl}game-assets/icons/${t}.png`;
+
+                return (
+                  <BuildButton
+                    key={t}
+                    selected={sel}
+                    affordable={ok}
+                    onClick={() => selectBuild(sel ? null : t)}
+                    title={formatCostPressure(state.buildings, "PLAYER", t)}
+                    hotkey={spec.hotkey}
+                    iconSrc={iconSrc}
+                    fallbackIcon={<Icon className="h-3 w-3" />}
+                    name={shortName(spec.name)}
+                    costLabel={`$${cost.funds}${cost.energy ? ` · ${cost.energy}E` : ""}`}
+                    accentColor={sel ? "var(--hud-energy)" : meta.color}
+                    selectionColor="var(--hud-energy)"
+                  />
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* ── STRIKE CONTROL ── */}
         <div className="min-w-0">
-          <div className="mb-1.5 flex items-center justify-between">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <div>
               <div className="text-[9px] uppercase tracking-[0.22em]" style={{ color: "rgba(240,76,76,0.7)" }}>STRIKE DOCTRINES</div>
               <div className="text-[11px] font-black tracking-[0.06em]" style={{ color: "rgba(240,76,76,0.9)" }}>LAUNCH CONTROL</div>
             </div>
             <div
-              className="px-2 py-0.5 text-[9px] uppercase tracking-widest"
+              className="shrink-0 px-2 py-0.5 text-[9px] uppercase tracking-widest"
               style={{
                 border: "1px solid rgba(240,76,76,0.35)",
                 background: "rgba(240,76,76,0.1)",
@@ -200,78 +272,80 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1">
-            {weaponOrder.map((t) => {
-              const cost = WEAPON_COSTS[t];
-              const lbl = WEAPON_LABELS[t];
-              const sel = state.selectedWeapon === t;
-              const needs =
-                t === "TRANSPORT_POD" ? hasMechBay :
-                t === "EMP" ? hasEmp :
-                t === "ICBM" ? hasIcbmSilo :
-                hasLauncher;
-              const ok = canAfford(cost.funds, cost.energy) && needs;
-              const icon =
-                t === "AA" ? <Crosshair className="h-3 w-3" /> :
-                t === "EMP" ? <Zap className="h-3 w-3" /> :
-                t === "TUNNEL_BUSTER" ? <Skull className="h-3 w-3" /> :
-                <Rocket className="h-3 w-3" />;
+          <div className="max-h-[min(28vh,168px)] overflow-y-auto overflow-x-hidden pr-0.5 [scrollbar-color:rgba(240,76,76,0.35)_transparent] [scrollbar-width:thin]">
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+              {weaponOrder.map((t) => {
+                const cost = WEAPON_COSTS[t];
+                const lbl = WEAPON_LABELS[t];
+                const sel = state.selectedWeapon === t;
+                const needs =
+                  t === "TRANSPORT_POD" ? hasMechBay :
+                  t === "EMP" ? hasEmp :
+                  t === "ICBM" ? hasIcbmSilo :
+                  hasLauncher;
+                const ok = canAfford(cost.funds, cost.energy) && needs;
+                const icon =
+                  t === "AA" ? <Crosshair className="h-3 w-3" /> :
+                  t === "EMP" ? <Zap className="h-3 w-3" /> :
+                  t === "TUNNEL_BUSTER" ? <Skull className="h-3 w-3" /> :
+                  <Rocket className="h-3 w-3" />;
 
-              return (
-                <BuildButton
-                  key={t}
-                  selected={sel}
-                  affordable={ok}
-                  onClick={() => selectWeapon(sel ? null : t)}
-                  title={lbl.desc + (needs ? "" : " (Requires launcher/silo)")}
-                  hotkey={lbl.hotkey}
-                  fallbackIcon={icon}
-                  name={lbl.name}
-                  costLabel={`$${cost.funds} · ${cost.energy}E`}
-                  accentColor={sel ? "var(--hud-player)" : "rgba(240,76,76,0.75)"}
-                  selectionColor="var(--hud-player)"
-                />
-              );
-            })}
-          </div>
+                return (
+                  <BuildButton
+                    key={t}
+                    selected={sel}
+                    affordable={ok}
+                    onClick={() => selectWeapon(sel ? null : t)}
+                    title={lbl.desc + (needs ? "" : " (Requires launcher/silo)")}
+                    hotkey={lbl.hotkey}
+                    fallbackIcon={icon}
+                    name={lbl.name}
+                    costLabel={`$${cost.funds} · ${cost.energy}E`}
+                    accentColor={sel ? "var(--hud-player)" : "rgba(240,76,76,0.75)"}
+                    selectionColor="var(--hud-player)"
+                  />
+                );
+              })}
+            </div>
 
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {(["GUNNER_I", "GUNNER_II"] as const).map((tier) => (
-              <button
-                key={tier}
-                type="button"
-                onClick={() => selectMechTier(tier)}
-                className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
-                style={{
-                  border: `1px solid ${state.selectedMechTier === tier ? "rgba(239,68,68,0.8)" : "rgba(148,163,184,0.3)"}`,
-                  background: state.selectedMechTier === tier ? "rgba(239,68,68,0.2)" : "rgba(15,23,42,0.6)",
-                  color: state.selectedMechTier === tier ? "#fecaca" : "#94a3b8",
-                }}
-                title={tier === "GUNNER_II" ? "Upgraded Marine (+HP/dmg, premium drop cost)" : "Standard Gunner-I"}
-              >
-                {tier === "GUNNER_I" ? "Gunner I" : "Gunner II"}
-              </button>
-            ))}
-            {(["NORMAL", "ANTI_MMR", "ANTI_POD"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => selectMechWeapon(mode)}
-                className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
-                style={{
-                  border: `1px solid ${state.selectedMechWeapon === mode ? "rgba(55,216,255,0.8)" : "rgba(148,163,184,0.3)"}`,
-                  background: state.selectedMechWeapon === mode ? "rgba(55,216,255,0.15)" : "rgba(15,23,42,0.6)",
-                  color: state.selectedMechWeapon === mode ? "#7dd3fc" : "#94a3b8",
-                }}
-                title={
-                  mode === "NORMAL" ? "Balanced vs Marines and Gun Pods" :
-                  mode === "ANTI_MMR" ? "+50% vs enemy Marines, -50% vs Gun Pods" :
-                  "+50% vs Gun Pods, -50% vs Marines"
-                }
-              >
-                {mode === "ANTI_MMR" ? "Anti-MMR" : mode === "ANTI_POD" ? "Anti-POD" : "Normal"}
-              </button>
-            ))}
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {(["GUNNER_I", "GUNNER_II"] as const).map((tier) => (
+                <button
+                  key={tier}
+                  type="button"
+                  onClick={() => selectMechTier(tier)}
+                  className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
+                  style={{
+                    border: `1px solid ${state.selectedMechTier === tier ? "rgba(239,68,68,0.8)" : "rgba(148,163,184,0.3)"}`,
+                    background: state.selectedMechTier === tier ? "rgba(239,68,68,0.2)" : "rgba(15,23,42,0.6)",
+                    color: state.selectedMechTier === tier ? "#fecaca" : "#94a3b8",
+                  }}
+                  title={tier === "GUNNER_II" ? "Upgraded Marine (+HP/dmg, premium drop cost)" : "Standard Gunner-I"}
+                >
+                  {tier === "GUNNER_I" ? "Gunner I" : "Gunner II"}
+                </button>
+              ))}
+              {(["NORMAL", "ANTI_MMR", "ANTI_POD"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => selectMechWeapon(mode)}
+                  className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
+                  style={{
+                    border: `1px solid ${state.selectedMechWeapon === mode ? "rgba(55,216,255,0.8)" : "rgba(148,163,184,0.3)"}`,
+                    background: state.selectedMechWeapon === mode ? "rgba(55,216,255,0.15)" : "rgba(15,23,42,0.6)",
+                    color: state.selectedMechWeapon === mode ? "#7dd3fc" : "#94a3b8",
+                  }}
+                  title={
+                    mode === "NORMAL" ? "Balanced vs Marines and Gun Pods" :
+                    mode === "ANTI_MMR" ? "+50% vs enemy Marines, -50% vs Gun Pods" :
+                    "+50% vs Gun Pods, -50% vs Marines"
+                  }
+                >
+                  {mode === "ANTI_MMR" ? "Anti-MMR" : mode === "ANTI_POD" ? "Anti-POD" : "Normal"}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -281,7 +355,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
         className="hidden justify-between border-t px-2 pb-1 pt-1 text-[8px] uppercase tracking-widest md:flex"
         style={{ borderColor: "var(--hud-line)", color: "rgba(100,116,139,0.5)" }}
       >
-        <span>Left island → BUILD · Right island → FIRE · ESC / Right-click → cancel</span>
+        <span>Tabs filter builds · Left island → BUILD · Right island → FIRE · ESC / Right-click → cancel</span>
         <span>1–0 build · Q–\ weapons · V layer · SPACE pause</span>
       </div>
     </div>
@@ -317,7 +391,7 @@ function BuildButton({
       onClick={onClick}
       title={title}
       className={cn(
-        "relative min-h-[54px] overflow-hidden p-1.5 text-left transition-all duration-150",
+        "relative min-h-[48px] overflow-hidden p-1 text-left transition-all duration-150 sm:min-h-[52px] sm:p-1.5",
         !affordable && !selected && "grayscale opacity-45"
       )}
       style={{
@@ -341,7 +415,7 @@ function BuildButton({
 
       {/* Icon cell — atlas art with glyph fallback */}
       <div
-        className="mb-1 grid h-6 w-7 place-items-center"
+        className="mb-0.5 grid h-5 w-6 place-items-center sm:mb-1 sm:h-6 sm:w-7"
         style={{
           border: "1px solid rgba(255,255,255,0.08)",
           background: selected ? `${selectionColor}22` : "rgba(0,0,0,0.35)",
@@ -352,7 +426,7 @@ function BuildButton({
           <img
             src={iconSrc}
             alt=""
-            className="h-5 w-5 object-contain"
+            className="h-4 w-4 object-contain sm:h-5 sm:w-5"
             onError={() => setImgFailed(true)}
           />
         ) : (
