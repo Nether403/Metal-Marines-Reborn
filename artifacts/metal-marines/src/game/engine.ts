@@ -1216,6 +1216,12 @@ const tickFactories = (state: RuntimeState, mission: MissionDef, dt: number) => 
     if (!isBuildingActive(factory, state.elapsed) || factory.cooldown > 0) continue;
 
     const owner = factory.side;
+    const doctrine = owner === "PLAYER" ? state.playerFactoryDoctrine : "AUTO";
+    if (doctrine === "HOLD") {
+      factory.cooldown = 4;
+      continue;
+    }
+
     const vehicles = countLiveVehicles(state, owner);
     const aircraft = countLiveAircraft(state, owner);
     const invaders = state.mechs.filter((m) => m.side === owner && m.owner !== owner && m.hp > 0).length;
@@ -1224,14 +1230,28 @@ const tickFactories = (state: RuntimeState, mission: MissionDef, dt: number) => 
       owner === "PLAYER" ||
       (state.elapsed >= enemyGrace && state.aiState.phase === "ASSAULT");
 
-    // Prefer defenders when invaders are present or garrison is empty.
-    const wantVehicle =
-      vehicles < MAX_VEHICLES_PER_SIDE &&
-      (invaders > 0 || vehicles < 1 || (aircraft >= MAX_AIRCRAFT_PER_SIDE && vehicles < MAX_VEHICLES_PER_SIDE));
-    const wantAircraft =
-      canAssault &&
-      aircraft < MAX_AIRCRAFT_PER_SIDE &&
-      (!wantVehicle || (invaders === 0 && vehicles >= 1));
+    let wantVehicle = false;
+    let wantAircraft = false;
+
+    if (doctrine === "APC") {
+      wantVehicle = vehicles < MAX_VEHICLES_PER_SIDE;
+    } else if (doctrine === "GUNSHIP") {
+      // Prefer gunships; still field APCs when invaders land on the home island.
+      wantVehicle = invaders > 0 && vehicles < MAX_VEHICLES_PER_SIDE;
+      wantAircraft =
+        canAssault &&
+        aircraft < MAX_AIRCRAFT_PER_SIDE &&
+        (!wantVehicle || (invaders === 0 && vehicles >= 1));
+    } else {
+      // AUTO: prefer defenders when invaders are present or garrison is empty.
+      wantVehicle =
+        vehicles < MAX_VEHICLES_PER_SIDE &&
+        (invaders > 0 || vehicles < 1 || (aircraft >= MAX_AIRCRAFT_PER_SIDE && vehicles < MAX_VEHICLES_PER_SIDE));
+      wantAircraft =
+        canAssault &&
+        aircraft < MAX_AIRCRAFT_PER_SIDE &&
+        (!wantVehicle || (invaders === 0 && vehicles >= 1));
+    }
 
     if (wantVehicle && spendSideResources(state, owner, FACTORY_VEHICLE_COST.funds, FACTORY_VEHICLE_COST.energy)) {
       spawnVehicleAtFactory(state, factory);

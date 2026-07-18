@@ -42,6 +42,13 @@ const HOTKEYS_BUILD: Record<string, string> = {
   "[": "TERRAIN_DESTABILIZER",
   "]": "WEATHER_CONTROL",
   "\\": "BIOSPHERE_ENGINE",
+  // Letter keys advertised on build chips (case-insensitive via toLowerCase lookup)
+  b: "HQ",
+  f: "FACTORY",
+  g: "GUN_POD",
+  i: "ICBM_SILO",
+  d: "DUMMY_BASE",
+  c: "DUMMY_COVER",
 };
 const HOTKEYS_WEAPON: Record<string, string> = {
   q: "ICBM",
@@ -231,8 +238,9 @@ export default function Play() {
         if (rt) setViewLayer(rt.viewLayer === "SURFACE" ? "UNDERGROUND" : "SURFACE");
         return;
       }
-      if (HOTKEYS_BUILD[e.key]) {
-        selectBuild(HOTKEYS_BUILD[e.key] as keyof typeof BUILDINGS);
+      const buildType = HOTKEYS_BUILD[e.key] ?? HOTKEYS_BUILD[k];
+      if (buildType) {
+        selectBuild(buildType as keyof typeof BUILDINGS);
       } else if (HOTKEYS_WEAPON[k]) {
         selectWeapon(HOTKEYS_WEAPON[k] as keyof typeof WEAPON_LABELS);
       }

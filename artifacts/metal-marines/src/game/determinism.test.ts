@@ -42,6 +42,7 @@ const makeState = (): RuntimeState => ({
   selectedWeapon: null,
   selectedMechWeapon: "NORMAL",
   selectedMechTier: "GUNNER_I",
+  playerFactoryDoctrine: "AUTO",
   viewLayer: "SURFACE",
   terrainMutations: [],
   aiState: {
@@ -178,6 +179,54 @@ assert.ok(
   assert.ok(state.aircraft.some((a) => a.owner === "PLAYER" && a.hp > 0), "Factory should launch a gunship");
   const hashes = [hashRuntimeFrame(state), hashRuntimeFrame(state)];
   assert.equal(hashes[0], hashes[1], "vehicle/aircraft state hashes stably");
+}
+
+// --- Factory doctrine: HOLD / APC preference ---
+{
+  const mission = idleMission("factory-doctrine", 1, 0.1, 0.8);
+  const hold = createMissionRuntime(mission);
+  hold.buildings.push({
+    id: "factory_hold",
+    type: "FACTORY",
+    side: "PLAYER",
+    owner: "PLAYER",
+    pos: { x: 6, y: 5 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.FACTORY.maxHp,
+    maxHp: BUILDINGS.FACTORY.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  hold.playerFunds = 2000;
+  hold.playerEnergy = 800;
+  hold.playerFactoryDoctrine = "HOLD";
+  for (let t = 0; t < 30; t += 0.25) stepGame(hold, mission, 0.25);
+  assert.equal(hold.vehicles.length, 0, "HOLD doctrine must not spawn APCs");
+  assert.equal(hold.aircraft.length, 0, "HOLD doctrine must not spawn gunships");
+
+  const apcOnly = createMissionRuntime(mission);
+  apcOnly.buildings.push({
+    id: "factory_apc",
+    type: "FACTORY",
+    side: "PLAYER",
+    owner: "PLAYER",
+    pos: { x: 6, y: 5 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.FACTORY.maxHp,
+    maxHp: BUILDINGS.FACTORY.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  apcOnly.playerFunds = 2000;
+  apcOnly.playerEnergy = 800;
+  apcOnly.playerFactoryDoctrine = "APC";
+  for (let t = 0; t < 45; t += 0.25) stepGame(apcOnly, mission, 0.25);
+  assert.ok(apcOnly.vehicles.some((v) => v.owner === "PLAYER" && v.hp > 0), "APC doctrine should spawn garrison APCs");
+  assert.equal(apcOnly.aircraft.length, 0, "APC doctrine must not launch gunships");
 }
 
 console.log("game determinism checks passed");

@@ -149,7 +149,17 @@ export interface TerrainMutation {
   sourceBuilding: string;
 }
 
-export type ReplayCommandType = "BUILD" | "FIRE" | "INTERCEPT" | "SELECT_BUILD" | "SELECT_WEAPON" | "SET_VIEW_LAYER";
+/** Player Factory production preference (enemy always uses AUTO). */
+export type FactoryDoctrine = "AUTO" | "APC" | "GUNSHIP" | "HOLD";
+
+export type ReplayCommandType =
+  | "BUILD"
+  | "FIRE"
+  | "INTERCEPT"
+  | "SELECT_BUILD"
+  | "SELECT_WEAPON"
+  | "SET_VIEW_LAYER"
+  | "SET_FACTORY_DOCTRINE";
 
 export interface ReplayCommand {
   frame: number;
@@ -273,6 +283,8 @@ export interface RuntimeState {
   selectedWeapon: ProjectileType | null;
   selectedMechWeapon: MechWeaponMode;
   selectedMechTier: MechTier;
+  /** Player-only Factory spawn preference; enemy Factories stay on AUTO. */
+  playerFactoryDoctrine: FactoryDoctrine;
   viewLayer: TileLayer;
   weatherActive?: {
     type: WeatherType;
