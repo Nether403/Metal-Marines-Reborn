@@ -2,7 +2,16 @@ import assert from "node:assert/strict";
 import { BUILDINGS, GRID_H, GRID_W } from "./constants";
 import { aiAttackGraceSeconds, aiEcoPhaseEndsAt, stepGame } from "./engine";
 import { findPath, terrainMoveCost } from "./pathfinding";
-import { hashRuntimeFrame, recordReplaySession, verifyReplaySnapshot } from "./replay";
+import {
+  advanceFixedStepAccumulator,
+  createReplayFrameHash,
+  createReplaySnapshot,
+  DEFAULT_REPLAY_TICK_DT,
+  hashRuntimeFrame,
+  MAX_FIXED_STEPS_PER_FRAME,
+  recordReplaySession,
+  verifyReplaySnapshot,
+} from "./replay";
 import { createMissionRuntime } from "./runtimeFactory";
 import { hashSeed, randomFloatFromSeed } from "./rng";
 import type { MissionDef, RuntimeState, Tile } from "./types";
@@ -53,7 +62,7 @@ const makeState = (): RuntimeState => ({
     memory: { seenPlayerBuildings: {}, aaProbeScore: 0, lastProbeAt: -999 },
   },
   stats: { missilesFired: 0, marinesDeployed: 0, buildingsLost: 0, buildingsDestroyed: 0, environmentalActions: 0 },
-  replay: { frame: 0, seed: hashSeed("test"), commands: [], hashes: [] },
+  replay: { frame: 0, seed: hashSeed("test"), tickDt: 1 / 30, commands: [], hashes: [] },
   shake: 0,
   playerIsland: makeTiles(),
   enemyIsland: makeTiles(),
@@ -363,6 +372,47 @@ assert.ok(
   const failed = verifyReplaySnapshot(mission, tampered, { tickDt });
   assert.equal(failed.ok, false, "tampered hash must fail verify");
   assert.ok(failed.firstMismatch, "tamper should report first mismatch");
+}
+
+// --- Fixed-step live capture (Play rAF accumulator) ---
+{
+  const tickDt = DEFAULT_REPLAY_TICK_DT;
+  // Nominal 60Hz display → two wall frames per sim tick at 30Hz
+  let acc = 0;
+  let totalSteps = 0;
+  for (let i = 0; i < 60; i++) {
+    const advanced = advanceFixedStepAccumulator(acc, 1 / 60, tickDt);
+    acc = advanced.accumulator;
+    totalSteps += advanced.steps;
+  }
+  assert.equal(totalSteps, 30, "60×(1/60) wall seconds should yield 30 fixed 1/30 steps");
+  assert.ok(acc < tickDt, "remainder must stay below one tick");
+
+  // Hitch / tab resume: wallDt capped externally at 0.05; accumulator still caps steps
+  const hitch = advanceFixedStepAccumulator(0, 0.05, tickDt, MAX_FIXED_STEPS_PER_FRAME);
+  assert.equal(hitch.steps, MAX_FIXED_STEPS_PER_FRAME, "long hitch must clamp to max steps/frame");
+  assert.ok(hitch.accumulator <= tickDt, "post-cap remainder must not spiral");
+
+  // Live-style: createMissionRuntime + fixed steps + export tickDt must verify
+  const mission = idleMission("replay-fixed-live", 1, 0.1, 0.8);
+  const state = createMissionRuntime(mission);
+  assert.equal(state.replay.tickDt, tickDt, "mission runtime stores fixed tickDt for live capture");
+  for (let i = 0; i < 120 && state.status === "PLAYING"; i++) {
+    stepGame(state, mission, state.replay.tickDt);
+    state.replay.frame++;
+    if (state.replay.frame % 60 === 0) {
+      state.replay.hashes.push(createReplayFrameHash(state, state.replay.frame));
+    }
+  }
+  const snapshot = createReplaySnapshot(
+    state,
+    state.replay.commands,
+    state.replay.hashes,
+    state.replay.tickDt
+  );
+  const verified = verifyReplaySnapshot(mission, snapshot);
+  assert.equal(verified.ok, true, "fixed-tickDt live capture must verify offline");
+  assert.ok(verified.framesChecked >= 1, "verify should check at least one hash frame");
 }
 
 console.log("game determinism checks passed");

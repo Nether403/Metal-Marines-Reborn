@@ -3,6 +3,9 @@ import { BUILDINGS, GRID_H, GRID_W } from "./constants";
 import { resetEntityIds, uid } from "./engine";
 import { hashSeed } from "./rng";
 
+/** Keep in sync with DEFAULT_REPLAY_TICK_DT in replay.ts (avoid circular import). */
+const MISSION_REPLAY_TICK_DT = 1 / 30;
+
 /** Build a fresh runtime for a mission (shared by store + idle-survival tests). */
 export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
   // Shared counter with engine.uid so replay verify reproduces the same entity ids.
@@ -120,6 +123,7 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
     replay: {
       frame: 0,
       seed,
+      tickDt: MISSION_REPLAY_TICK_DT,
       commands: [],
       hashes: [],
     },

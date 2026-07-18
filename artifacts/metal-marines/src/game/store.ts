@@ -22,7 +22,7 @@ import {
 import { createMissionRuntime } from "./runtimeFactory";
 import { GRID_H, GRID_W } from "./constants";
 import { hashSeed } from "./rng";
-import { createReplayFrameHash, REPLAY_HASH_INTERVAL } from "./replay";
+import { createReplayFrameHash, DEFAULT_REPLAY_TICK_DT, REPLAY_HASH_INTERVAL } from "./replay";
 import { getMission, MISSIONS } from "@/data/missions";
 
 const PROGRESS_KEY = "mm2026.progress.v1";
@@ -64,7 +64,7 @@ interface Store {
 
   startMission: (id: string) => void;
   endMission: (resume?: boolean) => void;
-  step: (dt: number) => void;
+  step: (dt?: number) => void;
   setPaused: (v: boolean) => void;
 
   selectBuild: (t: BuildingType | null) => void;
@@ -106,13 +106,16 @@ export const useGame = create<Store>((set, get) => ({
     } catch {}
   },
 
-  step: (dt: number) => {
+  step: (_dt?: number) => {
     const s = get();
     const { runtime, mission, paused } = s;
     if (!runtime || !mission || paused) return;
     if (runtime.status !== "PLAYING") return;
     const prevStatus = runtime.status;
-    stepGame(runtime, mission, dt);
+    // Live capture always uses fixed tickDt so EndScreen exports verify offline.
+    const tickDt = runtime.replay.tickDt || DEFAULT_REPLAY_TICK_DT;
+    runtime.replay.tickDt = tickDt;
+    stepGame(runtime, mission, tickDt);
     runtime.replay.frame++;
     if (runtime.replay.frame % REPLAY_HASH_INTERVAL === 0) {
       runtime.replay.hashes.push(createReplayFrameHash(runtime, runtime.replay.frame));
@@ -310,9 +313,10 @@ export const useGame = create<Store>((set, get) => ({
       parsed.runtime.terrainMutations ??= [];
       parsed.runtime.stats ??= {};
       parsed.runtime.stats.environmentalActions ??= 0;
-      parsed.runtime.replay ??= { frame: 0, seed: 0, commands: [], hashes: [] };
+      parsed.runtime.replay ??= { frame: 0, seed: 0, tickDt: DEFAULT_REPLAY_TICK_DT, commands: [], hashes: [] };
       parsed.runtime.replay.frame ??= 0;
       parsed.runtime.replay.seed ??= parsed.runtime.rngSeed ?? 0;
+      parsed.runtime.replay.tickDt ??= DEFAULT_REPLAY_TICK_DT;
       parsed.runtime.replay.commands ??= [];
       parsed.runtime.replay.hashes ??= [];
       parsed.runtime.playerIsland ??= m.playerIsland;

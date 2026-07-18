@@ -16,6 +16,10 @@ import {
 import { worldToTile, inIsland } from "@/game/engine";
 import { preloadGameSprites } from "@/game/sprites";
 import { preloadSfxSamples } from "@/lib/sfx";
+import {
+  advanceFixedStepAccumulator,
+  DEFAULT_REPLAY_TICK_DT,
+} from "@/game/replay";
 import type { Owner } from "@/game/types";
 import ResourceBar from "@/components/hud/ResourceBar";
 import BuildPalette from "@/components/hud/BuildPalette";
@@ -83,6 +87,7 @@ export default function Play() {
   const stageRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(performance.now());
+  const simAccRef = useRef(0);
   const hoverRef = useRef<{ side: Owner; x: number; y: number } | null>(null);
   const [canvasCssSize, setCanvasCssSize] = useState({ width: WORLD_W, height: WORLD_H });
   const [showBriefing, setShowBriefing] = useState(() => {
@@ -109,12 +114,21 @@ export default function Play() {
     void preloadSfxSamples();
   }, []);
 
-  // Game loop
+  // Game loop — fixed sim tickDt (replay-verifyable); render at display rate
   useEffect(() => {
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - lastTimeRef.current) / 1000);
+      const wallDt = Math.min(0.05, (now - lastTimeRef.current) / 1000);
       lastTimeRef.current = now;
-      if (!showBriefing) step(dt);
+      if (!showBriefing) {
+        const { paused, runtime: rtNow } = useGame.getState();
+        // Do not accumulate while paused — unpause should not dump catch-up steps.
+        if (!paused) {
+          const tickDt = rtNow?.replay.tickDt || DEFAULT_REPLAY_TICK_DT;
+          const advanced = advanceFixedStepAccumulator(simAccRef.current, wallDt, tickDt);
+          simAccRef.current = advanced.accumulator;
+          for (let i = 0; i < advanced.steps; i++) step();
+        }
+      }
       const c = canvasRef.current;
       const rt = useGame.getState().runtime;
       if (c && rt) {

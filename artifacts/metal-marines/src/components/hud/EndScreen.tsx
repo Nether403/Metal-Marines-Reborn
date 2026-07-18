@@ -4,7 +4,7 @@ import type { RuntimeState, MissionDef, CommanderProfile } from "@/game/types";
 import { useGame } from "@/game/store";
 import { COMMANDERS } from "@/data/commanders";
 import { MISSIONS } from "@/data/missions";
-import { createReplaySnapshot, DEFAULT_REPLAY_TICK_DT } from "@/game/replay";
+import { createReplaySnapshot } from "@/game/replay";
 
 export default function EndScreen({
   state,
@@ -28,8 +28,7 @@ export default function EndScreen({
       state,
       state.replay.commands,
       state.replay.hashes,
-      // Live play uses variable rAF dt; export nominal tick for tooling / future fixed-step capture.
-      DEFAULT_REPLAY_TICK_DT
+      state.replay.tickDt
     );
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -76,7 +75,7 @@ export default function EndScreen({
             variant="outline"
             className="font-mono border-primary/40"
             onClick={exportReplay}
-            title="Download command log + frame hashes as JSON (hash-verify needs fixed tickDt)"
+            title="Download command log + frame hashes as JSON (fixed tickDt — offline hash-verify ready)"
           >
             EXPORT REPLAY JSON
           </Button>
