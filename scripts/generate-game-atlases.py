@@ -6,7 +6,8 @@ Art direction from Game-art identity board:
   Player = olive drab / gunmetal + red & white markings (disciplined)
   Enemy  = charcoal / bronze + purple glow (brutal)
 
-Optional hero overlays from /tmp/mm-art (HF-generated HQ + mechs).
+Hero overlays in public/game-assets/heroes/ (HF + Cursor image gen).
+Also writes build-palette icons under public/game-assets/icons/.
 """
 from __future__ import annotations
 
@@ -14,7 +15,47 @@ import math
 import os
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
+from PIL import Image, ImageDraw, ImageEnhance
+
+# Building atlas row labels -> hero stem (player). Enemy derived via recolor.
+HERO_BUILDINGS = {
+    "HQ": "hq-player",
+    "ENERGY": "energy-player",
+    "RADAR": "radar-player",
+    "MISSILE": "missile-player",
+    "ICBM": "missile-player",
+    "TURRET": "turret-player",
+    "GUNPOD": "gunpod-player",
+    "AA": "aa-player",
+    "FACTORY": "factory-player",
+    "SUPPLY": "supply-player",
+    "MECHBAY": "factory-player",
+}
+
+# icons exported for BuildPalette (BuildingType -> atlas label)
+ICON_EXPORT = {
+    "HQ": "HQ",
+    "ENERGY_PLANT": "ENERGY",
+    "SUPPLY_DEPOT": "SUPPLY",
+    "FACTORY": "FACTORY",
+    "RADAR": "RADAR",
+    "MISSILE_LAUNCHER": "MISSILE",
+    "ICBM_SILO": "ICBM",
+    "AA_GUN": "AA",
+    "GUN_TURRET": "TURRET",
+    "GUN_POD": "GUNPOD",
+    "METAL_MARINE_BASE": "MECHBAY",
+    "EMP_CANNON": "EMP",
+    "RADAR_JAMMER": "JAMMER",
+    "DUMMY_BASE": "DUMMY",
+    "DUMMY_COVER": "DUMMYCOVER",
+    "LAND_MINE": "MINE",
+    "TUNNEL_ENTRANCE": "TUNNEL",
+    "SEISMIC_SENSOR": "SEISMIC",
+    "TERRAIN_DESTABILIZER": "DESTAB",
+    "WEATHER_CONTROL": "WEATHER",
+    "BIOSPHERE_ENGINE": "BIO",
+}
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts/metal-marines/public/game-assets"
@@ -104,30 +145,28 @@ def hazard_strip(d, x0, y0, x1, y1, pal, step=4):
         d.rectangle([x, y0, min(x + step - 1, x1), y1], fill=col)
 
 
-def remove_near_bg(im: Image.Image, tol: int = 38) -> Image.Image:
-    """Knock out flat studio grey backgrounds from HF renders."""
+def remove_near_bg(im: Image.Image, tol: int = 42) -> Image.Image:
+    """Knock out flat studio grey / green-screen-ish backdrops from hero renders."""
     im = im.convert("RGBA")
     px = im.load()
     w, h = im.size
-    samples = [px[2, 2], px[w - 3, 2], px[2, h - 3], px[w - 3, h - 3], px[w // 2, 2]]
+    samples = [px[2, 2], px[w - 3, 2], px[2, h - 3], px[w - 3, h - 3], px[w // 2, 2], px[w // 4, 2]]
     br, bg, bb = [sum(s[i] for s in samples) // len(samples) for i in range(3)]
     for y in range(h):
         for x in range(w):
             r, g, b, a = px[x, y]
             if abs(r - br) < tol and abs(g - bg) < tol and abs(b - bb) < tol:
                 px[x, y] = (r, g, b, 0)
-            elif abs(r - g) < 12 and abs(g - b) < 12 and 90 < r < 200:
-                # residual grey pedestal
-                if abs(r - br) < tol + 25:
+            elif abs(r - g) < 14 and abs(g - b) < 14 and 70 < r < 220:
+                if abs(r - br) < tol + 30:
                     px[x, y] = (r, g, b, 0)
-    # tight crop
     bbox = im.getbbox()
     if bbox:
         im = im.crop(bbox)
     return im
 
 
-def fit_rgba(src: Image.Image, tw: int, th: int, pad: int = 2) -> Image.Image:
+def fit_rgba(src: Image.Image, tw: int, th: int, pad: int = 1) -> Image.Image:
     src = src.convert("RGBA")
     src.thumbnail((tw - pad * 2, th - pad * 2), Image.Resampling.LANCZOS)
     out = new_rgba(tw, th)
@@ -137,32 +176,57 @@ def fit_rgba(src: Image.Image, tw: int, th: int, pad: int = 2) -> Image.Image:
     return out
 
 
+def to_enemy_faction(im: Image.Image) -> Image.Image:
+    """Recolor olive/red player art toward charcoal / bronze / purple enemy identity."""
+    im = im.convert("RGBA")
+    px = im.load()
+    w, h = im.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 8:
+                continue
+            # crush greens, push purple/bronze
+            nr = min(255, int(r * 0.55 + b * 0.15 + 35))
+            ng = min(255, int(g * 0.35 + r * 0.1 + 18))
+            nb = min(255, int(b * 0.45 + r * 0.25 + 55))
+            # keep bright red accents as gold/purple highlights
+            if r > 140 and r > g + 40 and r > b + 40:
+                nr, ng, nb = 196, 120, 255
+            px[x, y] = (nr, ng, nb, a)
+    return im
+
+
 def load_hero(name: str) -> Image.Image | None:
-    for ext in (".webp", ".png", ".jpg"):
+    # Prefer PNG (Cursor gens), then webp (HF).
+    for ext in (".png", ".webp", ".jpg"):
         p = HERO_DIR / f"{name}{ext}"
         if p.exists():
             return remove_near_bg(Image.open(p))
     return None
 
 
-def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str):
+def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str, pavement: Image.Image | None):
     cell = new_rgba(64, 64)
     cd = ImageDraw.Draw(cell)
     if kind == "grass":
+        # Classic Metal Marines: green island turf. Building pads are drawn in-renderer.
         for y in range(64):
             t = y / 63
-            # soft vertical gradient — avoid per-tile diamond overlays (reads as busy grid)
-            c = mix((42, 88, 48, 255), (78, 128, 62, 255), 1 - t * 0.35)
+            c = mix((48, 102, 52, 255), (86, 140, 68, 255), 1 - t * 0.4)
             cd.line([(0, y), (63, y)], fill=c)
-        for i in range(70):
+        for i in range(90):
             gx = (i * 17 + 5) % 60 + 2
             gy = (i * 23 + 9) % 58 + 3
-            cd.point((gx, gy), fill=(130, 190, 90, 160))
-            if i % 5 == 0:
-                cd.line([(gx, gy), (gx, gy - 2)], fill=(100, 170, 75, 140))
-        # subtle edge shade for tile separation
-        cd.line([(0, 63), (63, 63)], fill=(20, 40, 24, 60))
-        cd.line([(63, 0), (63, 63)], fill=(20, 40, 24, 40))
+            cd.point((gx, gy), fill=(120, 180, 85, 150))
+            if i % 6 == 0:
+                cd.line([(gx, gy), (gx, gy - 2)], fill=(95, 160, 70, 140))
+        # soft dirt flecks
+        for i in range(12):
+            dx = (i * 13 + 8) % 56 + 4
+            dy = (i * 19 + 11) % 52 + 6
+            cd.point((dx, dy), fill=(110, 95, 55, 90))
+        cd.rectangle([0, 0, 63, 63], outline=(20, 50, 28, 80))
     elif kind == "forest":
         for y in range(64):
             cd.line([(0, y), (63, y)], fill=mix((18, 48, 28, 255), (30, 70, 40, 255), y / 63))
@@ -210,10 +274,10 @@ def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str):
     img.paste(cell, (x0, y0), cell)
 
 
-def make_terrain():
+def make_terrain(pavement: Image.Image | None):
     img = new_rgba(64 * 5, 64)
     for i, kind in enumerate(["grass", "forest", "mountain", "water", "toxic"]):
-        paint_terrain_cell(img, i * 64, 0, kind)
+        paint_terrain_cell(img, i * 64, 0, kind, pavement)
     img.save(OUT / "terrain.png", optimize=True)
 
 
@@ -368,23 +432,41 @@ def tint_state(cell: Image.Image, state: str) -> Image.Image:
     return out
 
 
-def make_buildings(path: Path, palette, faction: str, hero_hq: Image.Image | None):
+def make_buildings(
+    path: Path,
+    palette,
+    faction: str,
+    heroes: dict[str, Image.Image],
+    export_icons: bool = False,
+):
     row_heights = [h for _, h in BUILDING_ROWS]
     width = 64 * 4
     height = sum(row_heights)
     img = new_rgba(width, height)
+    idle_by_label: dict[str, Image.Image] = {}
     y = 0
     for (label, h), rh in zip(BUILDING_ROWS, row_heights):
+        hero = heroes.get(label)
         for si, state in enumerate(STATES):
-            if label == "HQ" and hero_hq is not None and state == "idle":
-                cell = fit_rgba(hero_hq, 64, h, pad=1)
-            elif label == "HQ" and hero_hq is not None:
-                cell = tint_state(fit_rgba(hero_hq, 64, h, pad=1), state)
+            if hero is not None:
+                cell = tint_state(fit_rgba(hero, 64, h, pad=1), state)
             else:
                 cell = building_block(palette, label, state, 64, h, faction=faction)
+            if state == "idle":
+                idle_by_label[label] = cell.copy()
             img.paste(cell, (si * 64, y), cell)
         y += rh
     img.save(path, optimize=True)
+
+    if export_icons:
+        icon_dir = OUT / "icons"
+        icon_dir.mkdir(parents=True, exist_ok=True)
+        for building_type, label in ICON_EXPORT.items():
+            src = idle_by_label.get(label)
+            if src is None:
+                src = building_block(palette, label, "idle", 64, 64, faction=faction)
+            icon = fit_rgba(src, 48, 48, pad=2)
+            icon.save(icon_dir / f"{building_type}.png", optimize=True)
 
 
 def mech_frame(palette, pose: str, jagged: bool = False) -> Image.Image:
@@ -537,27 +619,36 @@ def make_ui():
 
 
 def main():
-    hq_p = load_hero("hq-player")
+    player_heroes: dict[str, Image.Image] = {}
+    for label, stem in HERO_BUILDINGS.items():
+        hero = load_hero(stem)
+        if hero is not None:
+            player_heroes[label] = hero
+    # dedicated enemy HQ if present; else recolor
+    enemy_heroes: dict[str, Image.Image] = {}
     hq_e = load_hero("hq-enemy")
+    for label, hero in player_heroes.items():
+        if label == "HQ" and hq_e is not None:
+            enemy_heroes[label] = hq_e
+        else:
+            enemy_heroes[label] = to_enemy_faction(hero)
+
     mech_p = load_hero("mech-player")
-    mech_e = load_hero("mech-enemy")
-    print(
-        "Hero overlays:",
-        {
-            "hq-player": bool(hq_p),
-            "hq-enemy": bool(hq_e),
-            "mech-player": bool(mech_p),
-            "mech-enemy": bool(mech_e),
-        },
-    )
-    make_terrain()
-    make_buildings(OUT / "buildings-player.png", PLAYER, "player", hq_p)
-    make_buildings(OUT / "buildings-enemy.png", ENEMY, "enemy", hq_e)
+    mech_e = load_hero("mech-enemy") or (to_enemy_faction(mech_p) if mech_p else None)
+    # Pavement hero crops poorly (selection diamond). Use procedural platform pads.
+    pavement = None
+
+    print("Player hero buildings:", sorted(player_heroes.keys()))
+    print("Mechs:", {"player": bool(mech_p), "enemy": bool(mech_e)}, "pavement:", bool(pavement))
+
+    make_terrain(pavement)
+    make_buildings(OUT / "buildings-player.png", PLAYER, "player", player_heroes, export_icons=True)
+    make_buildings(OUT / "buildings-enemy.png", ENEMY, "enemy", enemy_heroes, export_icons=False)
     make_units(mech_p, mech_e)
     make_projectiles()
     make_fx()
     make_ui()
-    # campaign theater backdrop if present
+
     theater_src = HERO_DIR / "theater.webp"
     campaign_dir = ROOT / "artifacts/metal-marines/public/campaign"
     campaign_dir.mkdir(parents=True, exist_ok=True)
@@ -566,10 +657,13 @@ def main():
         t = ImageEnhance.Contrast(t).enhance(1.08)
         t = ImageEnhance.Color(t).enhance(1.05)
         t.save(campaign_dir / "theater.jpg", quality=88, optimize=True)
-        print(f"Wrote campaign theater backdrop")
+        print("Wrote campaign theater backdrop")
+
     print(f"Wrote atlases to {OUT}")
     for p in sorted(OUT.glob("*.png")):
         print(f"  {p.name}: {p.stat().st_size} bytes {Image.open(p).size}")
+    icons = list((OUT / "icons").glob("*.png")) if (OUT / "icons").exists() else []
+    print(f"  icons/: {len(icons)} files")
 
 
 if __name__ == "__main__":

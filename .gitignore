@@ -1,56 +1,50 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
-# compiled output
-dist
-tmp
-out-tsc
-*.tsbuildinfo
-.expo
-.expo-shared
-
-# dependencies
-node_modules
-
-# IDEs and editors
-/.idea
-.project
-.classpath
+# but DO track the example template:
 .c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# IDE - VSCode
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-
-# misc
-/.sass-cache
+.cache/
+.classpath
+# compiled output
 /connect.lock
 /coverage
-/libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
-/typings
-
-# System Files
-.DS_Store
-Thumbs.db
-
 .cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-
-# Tooling caches
-.cache/
-.local/
-
-# Environment variables — never commit real secrets
+# dependencies
+dist
+.DS_Store
 .env
-.env.local
-.env.*.local
-# but DO track the example template:
 !.env.example
+# Environment variables — never commit real secrets
+.env.*.local
+.env.local
+.expo
+.expo-shared
+.github/instructions/nx.instructions.md
+/.idea
+# IDEs and editors
+# IDE - VSCode
+*.launch
+/libpeerconnection.log
+.local/
+# misc
+node_modules
+npm-debug.log
+out-tsc
+.project
+*.pyc
+__pycache__/
+/.sass-cache
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+.settings/
+*.sublime-workspace
+# System Files
+testem.log
+Thumbs.db
+tmp
+# Tooling caches
+*.tsbuildinfo
+/typings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+yarn-error.log

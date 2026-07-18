@@ -4,7 +4,7 @@ import type { BuildingType, ProjectileType, RuntimeState } from "@/game/types";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/utils";
 import { Crosshair, Hammer, Radio, Rocket, Shield, Skull, Zap } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 const buildOrder: BuildingType[] = [
   "HQ",
@@ -155,6 +155,10 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
               const cat = buildCategory[t];
               const meta = categoryMeta[cat];
               const Icon = meta.Icon;
+              const base = import.meta.env.BASE_URL.endsWith("/")
+                ? import.meta.env.BASE_URL
+                : `${import.meta.env.BASE_URL}/`;
+              const iconSrc = `${base}game-assets/icons/${t}.png`;
 
               return (
                 <BuildButton
@@ -164,7 +168,8 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                   onClick={() => selectBuild(sel ? null : t)}
                   title={formatCostPressure(state.buildings, "PLAYER", t)}
                   hotkey={spec.hotkey}
-                  icon={<Icon className="h-3 w-3" />}
+                  iconSrc={iconSrc}
+                  fallbackIcon={<Icon className="h-3 w-3" />}
                   name={shortName(spec.name)}
                   costLabel={`$${cost.funds}${cost.energy ? ` · ${cost.energy}E` : ""}`}
                   accentColor={sel ? "var(--hud-energy)" : meta.color}
@@ -220,7 +225,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                   onClick={() => selectWeapon(sel ? null : t)}
                   title={lbl.desc + (needs ? "" : " (Requires launcher/silo)")}
                   hotkey={lbl.hotkey}
-                  icon={icon}
+                  fallbackIcon={icon}
                   name={lbl.name}
                   costLabel={`$${cost.funds} · ${cost.energy}E`}
                   accentColor={sel ? "var(--hud-player)" : "rgba(240,76,76,0.75)"}
@@ -284,12 +289,13 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
 }
 
 function BuildButton({
-  selected, affordable, onClick, title, hotkey, icon, name, costLabel, accentColor, selectionColor,
+  selected, affordable, onClick, title, hotkey, iconSrc, fallbackIcon, name, costLabel, accentColor, selectionColor,
 }: {
   selected: boolean; affordable: boolean; onClick: () => void; title: string;
-  hotkey: string; icon: ReactNode; name: string; costLabel: string;
+  hotkey: string; iconSrc?: string; fallbackIcon?: ReactNode; name: string; costLabel: string;
   accentColor: string; selectionColor: string;
 }) {
+  const [imgFailed, setImgFailed] = useState(false);
   const borderColor = selected
     ? selectionColor
     : affordable
@@ -333,16 +339,25 @@ function BuildButton({
         {hotkey}
       </div>
 
-      {/* Icon cell */}
+      {/* Icon cell — atlas art with glyph fallback */}
       <div
-        className="mb-1 grid h-5 w-6 place-items-center"
+        className="mb-1 grid h-6 w-7 place-items-center"
         style={{
           border: "1px solid rgba(255,255,255,0.08)",
           background: selected ? `${selectionColor}22` : "rgba(0,0,0,0.35)",
           color: accentColor,
         }}
       >
-        {icon}
+        {iconSrc && !imgFailed ? (
+          <img
+            src={iconSrc}
+            alt=""
+            className="h-5 w-5 object-contain"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          fallbackIcon
+        )}
       </div>
 
       {/* Name */}
