@@ -28,7 +28,7 @@ and record why in Memories.
       green blobs). Regenerate terrain atlas; hard-refresh proof screenshot.
 2. [x] Building damaged/construction/disabled states: hero-quality frames (not
    just tint overlays) for HQ, Energy, Missile, Turret at minimum.
-3. [ ] Projectile + FX atlas upgrade: thicker missiles, bigger explosion flipbooks,
+3. [x] Projectile + FX atlas upgrade: thicker missiles, bigger explosion flipbooks,
       visible mech drop pods (battlefeel vs SNES remake).
 4. [ ] Mech walk/fight frames: distinct poses from hero art (not rotate/tint of idle).
 
