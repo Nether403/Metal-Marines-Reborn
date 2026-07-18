@@ -173,7 +173,7 @@ const M6_E = T(`
 ~~~~~~~~~~~~
 `);
 
-// Late-campaign authored maps (m13–m18) — choke islands for hard ops.
+// Late-campaign authored maps (m13–m20) — choke islands for hard ops.
 const M13_P = T(`
 ~~~~~~~~~~~~
 ~^^~....~^^~
@@ -324,6 +324,58 @@ const M18_E = T(`
 ~~.F.~~.F.~~
 ~.F.~..~.F.~
 ~F~~^^^^~~F~
+~~~~~~~~~~~~
+`);
+
+// Moat crown — water ring with cardinal land bridges (finale tier).
+const M19_P = T(`
+~~~~~~~~~~~~
+~^^^^~~^^^^~
+~^F~....~F^~
+~~.~.~~.~.~~
+~..F.HHH.F.~
+~....HHH...~
+~~.~.~~.~.~~
+~^F~....~F^~
+~^^^^~~^^^^~
+~~~~~~~~~~~~
+`);
+const M19_E = T(`
+~~~~~~~~~~~~
+~^^^^~~^^^^~
+~^F~....~F^~
+~~.~.~~.~.~~
+~....HHH...~
+~..F.HHH.F.~
+~~.~.~~.~.~~
+~^F~....~F^~
+~^^^^~~^^^^~
+~~~~~~~~~~~~
+`);
+
+// Crossfire isle — X-cut channels + mountain arms (campaign finale).
+const M20_P = T(`
+~~~~~~~~~~~~
+~F^^~..~^^F~
+~.~~F..F~~.~
+~^~.~~~~.~^~
+~.F..HHH..F~
+~..~.HHH.~.~
+~^~.~~~~.~^~
+~.~~F..F~~.~
+~F^^~~~~^^F~
+~~~~~~~~~~~~
+`);
+const M20_E = T(`
+~~~~~~~~~~~~
+~F^^~~~~^^F~
+~.~~F..F~~.~
+~^~.~~~~.~^~
+~..~.HHH.~.~
+~.F..HHH..F~
+~^~.~~~~.~^~
+~.~~F..F~~.~
+~F^^~..~^^F~
 ~~~~~~~~~~~~
 `);
 
@@ -651,6 +703,38 @@ const CAMPAIGN_EXTENSION: Array<{
     mapP: M18_P,
     mapE: M18_E,
   },
+  {
+    id: "m19",
+    index: 19,
+    title: "Operation: Moat Crown",
+    commanderId: "voss",
+    objective: "Cross the moat bridges and destroy the HQ.",
+    briefing:
+      "A water crown leaves only cardinal land bridges. Voss stacks Gun Pods on every span — Factory on GUNSHIP, punch AA first, then Anti-POD Marines through one bridge while Dummy Cover soaks the rest. Tunnel and ecology tech authorized if you can spare the diversion.",
+    difficulty: 6,
+    aggression: 0.97,
+    eco: 0.62,
+    funds: 2150,
+    energy: 980,
+    mapP: M19_P,
+    mapE: M19_E,
+  },
+  {
+    id: "m20",
+    index: 20,
+    title: "Operation: Crossfire Isle",
+    commanderId: "rhe",
+    objective: "Survive the crossfire and erase the final HQ.",
+    briefing:
+      "X-cut channels and mountain arms create four kill corridors. Rhe answers every breach with layered AA and silo nests — multi-base, Energy-priority gunships, ICBM only on an intact 3×3. This is the campaign finale.",
+    difficulty: 6,
+    aggression: 1.0,
+    eco: 0.68,
+    funds: 2200,
+    energy: 1000,
+    mapP: M20_P,
+    mapE: M20_E,
+  },
 ];
 
 for (const ext of CAMPAIGN_EXTENSION) {
@@ -670,27 +754,6 @@ for (const ext of CAMPAIGN_EXTENSION) {
     enemyEcoBias: ext.eco,
     startFunds: ext.funds,
     startEnergy: ext.energy,
-  });
-}
-
-// Missions 19–20: seeded procedural ops — hard cadence (diff ≥5).
-for (let i = 19; i <= 20; i++) {
-  const seed = `campaign-${i}`;
-  const difficulty = 6;
-  const generated = createProceduralMission({
-    seed,
-    difficulty,
-    title: `Operation: Frontier ${i}`,
-  });
-  MISSIONS.push({
-    ...generated,
-    id: `m${i}`,
-    index: i,
-    commanderId: ["voss", "rhe", "iyobi", "calder", "stryx", "null_"][(i - 1) % 6],
-    objective: generated.objective,
-    briefing: `${generated.briefing} Advanced campaign sector ${i}/20 — hard cadence. Tunnel and ecology tech are authorized if you can afford the diversion.`,
-    difficulty,
-    enemyAggression: Math.min(1, 0.85 + (i - 19) * 0.05),
   });
 }
 
