@@ -16,9 +16,9 @@ import {
   launchMissile,
   projectileCurrentPos,
   stepGame,
-  uid,
 } from "./engine";
-import { BUILDINGS, GRID_H, GRID_W } from "./constants";
+import { createMissionRuntime } from "./runtimeFactory";
+import { GRID_H, GRID_W } from "./constants";
 import { hashSeed } from "./rng";
 import { createReplayFrameHash } from "./replay";
 import { getMission, MISSIONS } from "@/data/missions";
@@ -82,124 +82,6 @@ interface Store {
   clearSnapshot: () => void;
 }
 
-const initRuntime = (mission: MissionDef): RuntimeState => {
-  const fogPlayer = new Array<boolean>(GRID_W * GRID_H).fill(true);
-  const fogEnemy = new Array<boolean>(GRID_W * GRID_H).fill(false);
-
-  const buildings: RuntimeState["buildings"] = [];
-  const pushBuilding = (
-    type: BuildingType,
-    side: "PLAYER" | "ENEMY",
-    pos: { x: number; y: number },
-    ready = true
-  ) => {
-    const spec = BUILDINGS[type];
-    buildings.push({
-      id: uid("b"),
-      type,
-      owner: side,
-      side,
-      pos,
-      footprintW: spec.footprintW ?? 1,
-      footprintH: spec.footprintH ?? 1,
-      hp: spec.maxHp,
-      maxHp: spec.maxHp,
-      buildTimeRemaining: ready ? 0 : spec.buildTime,
-      buildTimeTotal: ready ? 0 : spec.buildTime,
-      cooldown: 0,
-    });
-  };
-  // Player + enemy starting HQs (free, already constructed)
-  pushBuilding("HQ", "PLAYER", mission.playerStartHQ);
-  pushBuilding("HQ", "ENEMY", mission.enemyStartHQ);
-
-  // Give the AI a head-start of basic eco (gentler on easy missions)
-  pushBuilding("ENERGY_PLANT", "ENEMY", {
-    x: mission.enemyStartHQ.x - 2,
-    y: mission.enemyStartHQ.y,
-  });
-  pushBuilding("SUPPLY_DEPOT", "ENEMY", {
-    x: mission.enemyStartHQ.x + 2,
-    y: mission.enemyStartHQ.y,
-  });
-  if (mission.difficulty >= 2) {
-    pushBuilding("AA_GUN", "ENEMY", {
-      x: mission.enemyStartHQ.x,
-      y: mission.enemyStartHQ.y - 2,
-    });
-  }
-  if (mission.difficulty >= 3) {
-    pushBuilding("GUN_POD", "ENEMY", {
-      x: mission.enemyStartHQ.x + 1,
-      y: mission.enemyStartHQ.y + 1,
-    });
-  }
-
-  const withTunnels = (tiles: Tile[], hq: { x: number; y: number }): Tile[] =>
-    tiles.map((t) => {
-      const interior = t.x > 0 && t.y > 0 && t.x < GRID_W - 1 && t.y < GRID_H - 1;
-      const hqSpine = t.x === hq.x || t.y === hq.y;
-      const open = interior && t.terrain !== "WATER" && (hqSpine || (t.x + t.y) % 3 !== 0);
-      return { ...t, tunnel: t.tunnel ?? { open } };
-    });
-  const playerIsland = withTunnels(mission.playerIsland as Tile[], mission.playerStartHQ);
-  const enemyIsland = withTunnels(mission.enemyIsland as Tile[], mission.enemyStartHQ);
-
-  return {
-    status: "PLAYING",
-    missionId: mission.id,
-    rngSeed: hashSeed(`${mission.id}:${mission.index}:${mission.difficulty}`),
-    startedAt: Date.now(),
-    elapsed: 0,
-    playerFunds: mission.startFunds,
-    playerEnergy: mission.startEnergy,
-    enemyFunds: mission.startFunds,
-    enemyEnergy: mission.startEnergy,
-    playerFundsRate: 2,
-    playerEnergyRate: 0,
-    buildings,
-    projectiles: [],
-    mechs: [],
-    vehicles: [],
-    aircraft: [],
-    particles: [],
-    fogPlayer,
-    fogEnemy,
-    alerts: [],
-    selectedBuild: null,
-    selectedWeapon: null,
-    selectedMechWeapon: "NORMAL",
-    selectedMechTier: "GUNNER_I",
-    viewLayer: "SURFACE",
-    terrainMutations: [],
-    aiState: {
-      phase: "ECO",
-      nextActionAt: mission.difficulty <= 1 ? 14 : mission.difficulty <= 2 ? 10 : 6,
-      builtCount: 0,
-      memory: {
-        seenPlayerBuildings: {},
-        aaProbeScore: 0,
-        lastProbeAt: -999,
-      },
-    },
-    stats: {
-      missilesFired: 0,
-      marinesDeployed: 0,
-      buildingsLost: 0,
-      buildingsDestroyed: 0,
-      environmentalActions: 0,
-    },
-    replay: {
-      frame: 0,
-      commands: [],
-      hashes: [],
-    },
-    shake: 0,
-    playerIsland,
-    enemyIsland,
-  };
-};
-
 export const useGame = create<Store>((set, get) => ({
   runtime: null,
   mission: null,
@@ -209,7 +91,8 @@ export const useGame = create<Store>((set, get) => ({
   startMission: (id: string) => {
     const m = getMission(id);
     if (!m) return;
-    const rt = initRuntime(m);
+    const rt = createMissionRuntime(m);
+    rt.startedAt = Date.now();
     set({ runtime: rt, mission: m, paused: false });
   },
 

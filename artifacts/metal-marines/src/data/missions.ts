@@ -211,7 +211,7 @@ export const MISSIONS: MissionDef[] = [
     enemyIsland: M2_E,
     playerStartHQ: { x: 5, y: 5 },
     enemyStartHQ: { x: 5, y: 5 },
-    enemyAggression: 0.5,
+    enemyAggression: 0.35,
     enemyEcoBias: 0.6,
     startFunds: 1100,
     startEnergy: 500,
