@@ -215,6 +215,124 @@ def load_hero(name: str) -> Image.Image | None:
     return None
 
 
+def paint_tree_canopy(cd: ImageDraw.ImageDraw, cx: int, cy: int, r: int, lit: bool = True):
+    """One top-down tree: dark rim + solid crown + top-left highlight.
+
+    Sized for 64px combat tiles so clumps read as trees, not soft green blobs.
+    """
+    shadow = (6, 22, 12, 255)
+    deep = (16, 58, 30, 255)
+    mid = (32, 108, 52, 255)
+    hi = (78, 164, 82, 255) if lit else (52, 130, 60, 255)
+    tip = (130, 200, 105, 240) if lit else (88, 156, 78, 220)
+    trunk = (70, 50, 32, 200)
+
+    # ground shadow + short trunk stub under the crown
+    cd.ellipse(
+        [cx - r + 2, cy + max(2, r // 3), cx + r - 2, cy + r // 2 + 4],
+        fill=(4, 14, 8, 170),
+    )
+    if r >= 8:
+        cd.rectangle([cx - 1, cy + r // 5, cx + 1, cy + r // 2 + 1], fill=trunk)
+
+    # hard outer silhouette so neighboring trees separate at combat zoom
+    cd.ellipse([cx - r, cy - r + 1, cx + r, cy + r - 1], fill=shadow)
+    cd.ellipse([cx - r + 1, cy - r + 2, cx + r - 1, cy + r - 3], fill=deep)
+
+    # scalloped leaf mass around the rim (chunky, not ring/eyeball)
+    lobes = 6 if r >= 9 else 5
+    for i in range(lobes):
+        ang = (i / lobes) * math.tau + 0.2
+        lr = max(3, (r * 2) // 5)
+        lx = int(cx + math.cos(ang) * (r * 0.62))
+        ly = int(cy + math.sin(ang) * (r * 0.55))
+        cd.ellipse([lx - lr, ly - lr, lx + lr, ly + lr], fill=mid if i % 2 == 0 else deep)
+
+    # solid crown fill so the center isn't a hole
+    cd.ellipse([cx - r + 2, cy - r + 3, cx + r - 2, cy + r - 4], fill=mid)
+    # top-left light (classic MM read)
+    cd.ellipse(
+        [cx - r + 3, cy - r + 3, cx + max(2, r // 3), cy + max(1, r // 5)],
+        fill=hi,
+    )
+    cd.ellipse(
+        [cx - r // 2, cy - r + 4, cx - 1, cy - r // 3],
+        fill=tip,
+    )
+    # a couple leaf flecks for texture without breaking the silhouette
+    cd.point((cx + 1, cy - 1), fill=tip)
+    cd.point((cx - 2, cy + 1), fill=deep)
+
+
+def paint_forest_tile(cell: Image.Image, understory: Image.Image | None = None):
+    """Dense canopy forest tile readable at combat zoom (64px)."""
+    cd = ImageDraw.Draw(cell)
+    # near-black understory so crowns pop against grass islands
+    for y in range(64):
+        t = y / 63
+        c = mix((6, 22, 12, 255), (14, 40, 20, 255), t)
+        cd.line([(0, y), (63, y)], fill=c)
+
+    # optional hero texture: crush into dark undergrowth, never the sole silhouette
+    if understory is not None:
+        u = understory.convert("RGBA").resize((64, 64), Image.Resampling.LANCZOS)
+        upx = u.load()
+        for y in range(64):
+            for x in range(64):
+                r, g, b, a = upx[x, y]
+                if a < 20:
+                    continue
+                # keep greens, darken hard so procedural crowns carry the read
+                nr = max(0, int(r * 0.18 + 4))
+                ng = max(0, int(g * 0.28 + 8))
+                nb = max(0, int(b * 0.16 + 4))
+                upx[x, y] = (nr, ng, nb, min(a, 90))
+        cell.alpha_composite(u)
+
+    # brush / fern undergrowth between trunks
+    for i in range(22):
+        bx = (i * 11 + 3) % 60 + 2
+        by = (i * 17 + 7) % 58 + 3
+        cd.ellipse([bx, by, bx + 3, by + 2], fill=(14, 52, 24, 200))
+        if i % 4 == 0:
+            cd.line([(bx + 1, by + 1), (bx + 1, by - 3)], fill=(28, 80, 36, 160))
+
+    # Dense tree crowns — packed, slightly overlapping, clear silhouettes.
+    # Order: back (top) to front (bottom) for simple depth.
+    trees = [
+        (10, 14, 9, True),
+        (28, 10, 10, True),
+        (46, 13, 9, False),
+        (16, 26, 11, True),
+        (36, 24, 12, True),
+        (52, 28, 10, True),
+        (8, 38, 10, False),
+        (24, 40, 11, True),
+        (42, 38, 12, True),
+        (56, 42, 9, False),
+        (14, 52, 10, True),
+        (32, 54, 11, True),
+        (48, 52, 10, True),
+        (4, 22, 7, False),
+        (58, 18, 7, True),
+        (20, 18, 8, False),
+    ]
+    for cx, cy, r, lit in trees:
+        paint_tree_canopy(cd, cx, cy, r, lit)
+
+    # dark seams between crowns — critical for "trees not blobs" at distance
+    for i in range(10):
+        sx = (i * 19 + 8) % 56 + 4
+        sy = (i * 13 + 10) % 54 + 5
+        cd.ellipse([sx, sy, sx + 4, sy + 3], fill=(4, 14, 8, 160))
+
+    # sparse litter / needles so the floor isn't a flat void in gaps
+    for i in range(14):
+        lx = (i * 13 + 5) % 62
+        ly = (i * 19 + 9) % 62
+        cd.point((lx, ly), fill=(70, 90, 40, 120))
+
+
 def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str, pavement: Image.Image | None):
     cell = new_rgba(64, 64)
     cd = ImageDraw.Draw(cell)
@@ -237,12 +355,7 @@ def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str, pavement: 
             cd.point((dx, dy), fill=(110, 95, 55, 90))
         cd.rectangle([0, 0, 63, 63], outline=(20, 50, 28, 80))
     elif kind == "forest":
-        for y in range(64):
-            cd.line([(0, y), (63, y)], fill=mix((18, 48, 28, 255), (30, 70, 40, 255), y / 63))
-        for cx, cy, r in [(18, 30, 13), (40, 24, 15), (34, 42, 12), (14, 46, 10), (48, 44, 9)]:
-            cd.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(22, 90, 45, 255))
-            cd.ellipse([cx - r + 3, cy - r + 2, cx + r - 5, cy + r - 6], fill=(40, 130, 65, 230))
-            cd.ellipse([cx - 2, cy - r // 2, cx + 3, cy - r // 2 + 4], fill=(55, 150, 80, 200))
+        paint_forest_tile(cell)
     elif kind == "mountain":
         for y in range(64):
             cd.line([(0, y), (63, y)], fill=mix((70, 75, 85, 255), (110, 115, 125, 255), y / 63))
@@ -322,10 +435,18 @@ def make_terrain(pavement: Image.Image | None):
     sliced = slice_terrain_sheet()
     kinds = ["grass", "forest", "mountain", "water", "toxic"]
     for i, kind in enumerate(kinds):
+        # Forest: always stamp combat-readable canopy clumps. Hero slice (if any)
+        # is crushed into understory texture so downscaled AI art doesn't blob out.
+        if kind == "forest":
+            cell = new_rgba(64, 64)
+            paint_forest_tile(cell, understory=sliced.get("forest") if sliced else None)
+            cd = ImageDraw.Draw(cell)
+            cd.rectangle([0, 0, 63, 63], outline=(10, 16, 30, 70))
+            img.paste(cell, (i * 64, 0), cell)
+            continue
         if sliced and kind in sliced:
             fills = {
                 "grass": (56, 118, 58, 255),
-                "forest": (28, 72, 36, 255),
                 "mountain": (90, 96, 108, 255),
                 "water": (18, 70, 130, 255),
             }
@@ -341,6 +462,7 @@ def make_terrain(pavement: Image.Image | None):
         paint_terrain_cell(img, 4 * 64, 0, "toxic", pavement)
     img.save(OUT / "terrain.png", optimize=True)
     print("Terrain sheet slices:", list(sliced.keys()) if sliced else "procedural-only")
+    print("Forest: procedural canopy clumps (hero understory blended when present)")
 
 
 def building_block(palette, label: str, state: str, w=64, h=64, faction="player") -> Image.Image:

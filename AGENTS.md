@@ -24,7 +24,7 @@ and record why in Memories.
 ### Backlog (pick top unfinished)
 
 #### P0 — Battlefield still feels sparse / soft
-1. [ ] Forest tiles: denser canopy clumps that read as trees at combat zoom (not
+1. [x] Forest tiles: denser canopy clumps that read as trees at combat zoom (not
       green blobs). Regenerate terrain atlas; hard-refresh proof screenshot.
 2. [ ] Building damaged/construction/disabled states: hero-quality frames (not
       just tint overlays) for HQ, Energy, Missile, Turret at minimum.
