@@ -36,6 +36,9 @@ HERO_BUILDINGS = {
     "DESTAB": "destab-player",
     "WEATHER": "weather-player",
     "BIO": "biosphere-player",
+    "EMP": "emp-player",
+    "DUMMY": "dummy-player",
+    "DUMMYCOVER": "dummy-player",
 }
 
 # icons exported for BuildPalette (BuildingType -> atlas label)
@@ -280,11 +283,64 @@ def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str, pavement: 
     img.paste(cell, (x0, y0), cell)
 
 
+def slice_terrain_sheet() -> dict[str, Image.Image] | None:
+    """Extract grass/forest/mountain/water from heroes/terrain-sheet.png if present."""
+    sheet = None
+    for ext in (".png", ".webp"):
+        p = HERO_DIR / f"terrain-sheet{ext}"
+        if p.exists():
+            sheet = Image.open(p).convert("RGBA")
+            break
+    if sheet is None:
+        return None
+    w, h = sheet.size
+    # Four tiles in a horizontal strip, roughly centered vertically.
+    cell_w = w // 4
+    y0 = int(h * 0.18)
+    y1 = int(h * 0.82)
+    keys = ["grass", "forest", "mountain", "water"]
+    out: dict[str, Image.Image] = {}
+    for i, key in enumerate(keys):
+        crop = sheet.crop((i * cell_w + 8, y0, (i + 1) * cell_w - 8, y1))
+        # knock near-black backdrop
+        px = crop.load()
+        cw, ch = crop.size
+        for y in range(ch):
+            for x in range(cw):
+                r, g, b, a = px[x, y]
+                if r < 28 and g < 28 and b < 28:
+                    px[x, y] = (0, 0, 0, 0)
+        bbox = crop.getbbox()
+        if bbox:
+            crop = crop.crop(bbox)
+        out[key] = fit_rgba(crop, 64, 64, pad=0)
+    return out
+
+
 def make_terrain(pavement: Image.Image | None):
     img = new_rgba(64 * 5, 64)
-    for i, kind in enumerate(["grass", "forest", "mountain", "water", "toxic"]):
-        paint_terrain_cell(img, i * 64, 0, kind, pavement)
+    sliced = slice_terrain_sheet()
+    kinds = ["grass", "forest", "mountain", "water", "toxic"]
+    for i, kind in enumerate(kinds):
+        if sliced and kind in sliced:
+            fills = {
+                "grass": (56, 118, 58, 255),
+                "forest": (28, 72, 36, 255),
+                "mountain": (90, 96, 108, 255),
+                "water": (18, 70, 130, 255),
+            }
+            fill = fills.get(kind, (40, 40, 40, 255))
+            bg = Image.new("RGBA", (64, 64), fill)
+            bg.paste(sliced[kind], (0, 0), sliced[kind])
+            flat = Image.alpha_composite(Image.new("RGBA", (64, 64), fill), bg)
+            img.paste(flat, (i * 64, 0))
+        else:
+            paint_terrain_cell(img, i * 64, 0, kind, pavement)
+    # toxic always procedural
+    if sliced:
+        paint_terrain_cell(img, 4 * 64, 0, "toxic", pavement)
     img.save(OUT / "terrain.png", optimize=True)
+    print("Terrain sheet slices:", list(sliced.keys()) if sliced else "procedural-only")
 
 
 def building_block(palette, label: str, state: str, w=64, h=64, faction="player") -> Image.Image:
