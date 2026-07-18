@@ -210,36 +210,23 @@ def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str, pavement: 
     cell = new_rgba(64, 64)
     cd = ImageDraw.Draw(cell)
     if kind == "grass":
-        if pavement is not None:
-            pad = fit_rgba(pavement, 64, 64, pad=0)
-            cell.paste(pad, (0, 0), pad)
-            # grassy corners like classic Metal Marines island pads
-            for pts in (
-                [(0, 0), (14, 0), (0, 14)],
-                [(63, 0), (49, 0), (63, 14)],
-                [(0, 63), (14, 63), (0, 49)],
-                [(63, 63), (49, 63), (63, 49)],
-            ):
-                cd.polygon(pts, fill=(56, 110, 52, 210))
-            # rivet dots
-            for rx, ry in [(10, 10), (54, 10), (10, 54), (54, 54), (32, 8), (32, 56)]:
-                cd.ellipse([rx - 1, ry - 1, rx + 1, ry + 1], fill=(180, 180, 170, 160))
-        else:
-            for y in range(64):
-                t = y / 63
-                c = mix((90, 95, 88, 255), (120, 125, 115, 255), 1 - t * 0.3)
-                cd.line([(0, y), (63, y)], fill=c)
-            for i in range(6):
-                cd.line([(8 + i * 10, 6), (8 + i * 10, 58)], fill=(70, 74, 68, 50), width=1)
-            for pts in (
-                [(0, 0), (16, 0), (0, 16)],
-                [(63, 0), (47, 0), (63, 16)],
-                [(0, 63), (16, 63), (0, 47)],
-                [(63, 63), (47, 63), (63, 47)],
-            ):
-                cd.polygon(pts, fill=(48, 100, 48, 220))
-            hazard_strip(cd, 4, 58, 60, 62, PLAYER, 4)
-        cd.rectangle([0, 0, 63, 63], outline=(30, 34, 40, 100))
+        # Classic Metal Marines: green island turf. Building pads are drawn in-renderer.
+        for y in range(64):
+            t = y / 63
+            c = mix((48, 102, 52, 255), (86, 140, 68, 255), 1 - t * 0.4)
+            cd.line([(0, y), (63, y)], fill=c)
+        for i in range(90):
+            gx = (i * 17 + 5) % 60 + 2
+            gy = (i * 23 + 9) % 58 + 3
+            cd.point((gx, gy), fill=(120, 180, 85, 150))
+            if i % 6 == 0:
+                cd.line([(gx, gy), (gx, gy - 2)], fill=(95, 160, 70, 140))
+        # soft dirt flecks
+        for i in range(12):
+            dx = (i * 13 + 8) % 56 + 4
+            dy = (i * 19 + 11) % 52 + 6
+            cd.point((dx, dy), fill=(110, 95, 55, 90))
+        cd.rectangle([0, 0, 63, 63], outline=(20, 50, 28, 80))
     elif kind == "forest":
         for y in range(64):
             cd.line([(0, y), (63, y)], fill=mix((18, 48, 28, 255), (30, 70, 40, 255), y / 63))
