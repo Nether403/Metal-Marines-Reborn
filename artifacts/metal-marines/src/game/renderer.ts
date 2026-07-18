@@ -403,6 +403,12 @@ const drawIsland = (
       if (!drewTerrain) {
         drawTerrainFallback(ctx, tile, px, py, x, y, t);
       }
+      // Per-tile grass micro-variation so the island doesn't read as flat green paper
+      if (tile.terrain === "GRASS") {
+        const n = ((x * 17 + y * 31) % 7) / 7;
+        ctx.fillStyle = `rgba(20,60,30,${0.04 + n * 0.07})`;
+        ctx.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
+      }
       // Animated water shimmer / foam (battlefeel without new assets)
       if (tile.terrain === "WATER") {
         const phase = t * 2.2 + x * 0.7 + y * 0.55;
@@ -766,8 +772,11 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
   ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
   ctx.restore();
 
-  // Overscale so hero atlas art reads like SNES remake silhouettes.
-  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: (TILE_PX / 64) * 1.45 })) {
+  // HQ reads largest (classic MM command presence); other structures slightly overscale.
+  const scale =
+    (TILE_PX / 64) *
+    (b.type === "HQ" || b.type === "ICBM_SILO" ? 1.75 : b.type === "METAL_MARINE_BASE" ? 1.6 : 1.52);
+  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale })) {
     // Sprite rendered successfully; overlays below still show EMP/progress/HP.
   } else {
     drawProceduralBuilding(ctx, b, cx, cy, now);
@@ -1147,10 +1156,19 @@ const drawSeaBetween = (ctx: CanvasRenderingContext2D, t: number) => {
     ctx.fillStyle = `rgba(56,189,248,${0.035 + 0.035 * Math.sin(t + i)})`;
     ctx.fillRect(x + 7 + ((i * 17) % Math.max(1, SKY_GAP_PX - 14)), yy, 2, 2);
   }
+  // Vertical radar sweep across contested airspace
+  const sweepX = x + ((t * 40) % SKY_GAP_PX);
+  const sweep = ctx.createLinearGradient(sweepX - 24, 0, sweepX + 8, 0);
+  sweep.addColorStop(0, "rgba(34,211,238,0)");
+  sweep.addColorStop(0.7, "rgba(34,211,238,0.12)");
+  sweep.addColorStop(1, "rgba(34,211,238,0)");
+  ctx.fillStyle = sweep;
+  ctx.fillRect(x, 0, SKY_GAP_PX, ISLAND_PX_H);
+
   ctx.font = "10px 'Space Mono', monospace";
-  ctx.fillStyle = "rgba(56,189,248,0.45)";
+  ctx.fillStyle = "rgba(56,189,248,0.55)";
   ctx.textAlign = "center";
-  ctx.fillText("- SECTOR 7 ATLANTIC OPS -", x + SKY_GAP_PX / 2, 16);
+  ctx.fillText("- PACIFIC THEATER -", x + SKY_GAP_PX / 2, 16);
   ctx.fillText("// CONTESTED AIRSPACE //", x + SKY_GAP_PX / 2, ISLAND_PX_H - 8);
   ctx.textAlign = "start";
 };
