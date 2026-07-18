@@ -187,7 +187,7 @@ export const MISSIONS: MissionDef[] = [
     commanderId: "voss",
     objective: "Destroy the enemy Headquarters.",
     briefing:
-      "Coalition forces have located a rookie outpost on the eastern reach. Cadet Voss commands. Establish a foothold, build out economy, and end the operation before reinforcements arrive.",
+      "Theater Command marks this eastern sector Available — Cadet Voss holds a rookie outpost. Raise Supply Depots and Energy Plants, then a Missile Silo or Mech Bay. Radar and AA buy you time; finish his Headquarters before reinforcements arrive.",
     difficulty: 1,
     playerIsland: M1_P,
     enemyIsland: M1_E,

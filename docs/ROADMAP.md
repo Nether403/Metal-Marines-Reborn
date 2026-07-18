@@ -43,7 +43,7 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - Expand campaign missions
 
 ### Phase 4 — Teach and balance
-- Update HowToPlay + mission briefings
+- Update HowToPlay + mission briefings (M1 + Theater Command teach pass done)
 - Balance costs / AI so idle missions are not instant defeat
 - Determinism / regression checks (`test:game`, seeded init)
 

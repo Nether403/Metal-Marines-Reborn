@@ -57,23 +57,39 @@ export default function HowToPlay() {
           <Card className="bg-card/50 border-primary/20">
             <CardContent className="p-6 space-y-3">
               <h2 className="text-lg font-bold text-secondary font-mono uppercase">03 :: Buildings</h2>
+              <p className="text-xs text-muted-foreground font-mono">
+                Build palette tabs: Base · Intel · Weapons · Eco
+              </p>
               <ul className="text-sm space-y-1.5">
-                <li><b className="text-red-400">Headquarters</b> — up to 3 bases. Last base standing wins.</li>
-                <li><b className="text-cyan-400">Energy Plant</b> — generates Energy.</li>
-                <li><b className="text-yellow-400">Supply Depot</b> — generates Funds.</li>
-                <li><b className="text-amber-300">Factory</b> — accelerates build timers.</li>
-                <li><b className="text-slate-300">Dummy Base / Cover</b> — decoy HQ and radar concealment.</li>
-                <li><b className="text-purple-400">Radar Array</b> — reveals the enemy island; each Radar adds +5% AA hit chance (base 50%, cap 100%).</li>
-                <li><b className="text-fuchsia-400">Radar Jammer</b> — creates false signatures and complicates intercepts.</li>
-                <li><b className="text-orange-400">Missile Silo</b> — fires Dummies, AA, and Tunnel Busters.</li>
-                <li><b className="text-rose-300">ICBM Silo (3×3)</b> — required for ICBMs; the whole footprint must stay intact.</li>
-                <li><b className="text-sky-300">EMP Cannon</b> — disables clustered enemy systems for a short window.</li>
-                <li><b className="text-red-400">Mech Bay</b> — launches transport pods (max 3 Marines assaulting).</li>
-                <li><b className="text-lime-300">AA Battery</b> — auto-intercepts; accuracy scales with Radar count.</li>
-                <li><b className="text-amber-400">Gun Turret / Gun Pod</b> — anti-mech defenses (Pods are classic bunkers).</li>
-                <li><b className="text-slate-400">Land Mine</b> — hidden trap under enemy mechs.</li>
-                <li><b className="text-amber-300">Tunnel Gate / Seismic</b> — mid-campaign subterranean warfare.</li>
-                <li><b className="text-lime-300">Destabilizer / Weather / Biosphere</b> — ecological warfare unlocks.</li>
+                <li>
+                  <span className="text-cyan-300 font-bold uppercase tracking-wide text-xs">Base</span>{" "}
+                  — <b className="text-red-400">HQ</b> (up to 3; last standing wins),{" "}
+                  <b className="text-cyan-400">Energy Plant</b>,{" "}
+                  <b className="text-yellow-400">Supply Depot</b>,{" "}
+                  <b className="text-amber-300">Factory</b>,{" "}
+                  <b className="text-slate-300">Dummy Base / Cover</b>
+                </li>
+                <li>
+                  <span className="text-purple-300 font-bold uppercase tracking-wide text-xs">Intel</span>{" "}
+                  — <b className="text-purple-400">Radar Array</b> (+5% AA hit each; base 50%, cap 100%),{" "}
+                  <b className="text-fuchsia-400">Radar Jammer</b>,{" "}
+                  <b className="text-amber-300">Tunnel Gate / Seismic</b> (mid-campaign)
+                </li>
+                <li>
+                  <span className="text-red-300 font-bold uppercase tracking-wide text-xs">Weapons</span>{" "}
+                  — <b className="text-orange-400">Missile Silo</b>,{" "}
+                  <b className="text-rose-300">ICBM Silo (3×3 intact)</b>,{" "}
+                  <b className="text-sky-300">EMP Cannon</b>,{" "}
+                  <b className="text-red-400">Mech Bay</b> (max 3 Marines),{" "}
+                  <b className="text-lime-300">AA Battery</b>,{" "}
+                  <b className="text-amber-400">Gun Turret / Gun Pod</b>,{" "}
+                  <b className="text-slate-400">Land Mine</b>
+                </li>
+                <li>
+                  <span className="text-lime-300 font-bold uppercase tracking-wide text-xs">Eco</span>{" "}
+                  — <b className="text-lime-300">Destabilizer / Weather / Biosphere</b> unlock as optional
+                  campaign branches once classic doctrine is secure.
+                </li>
               </ul>
             </CardContent>
           </Card>
@@ -108,11 +124,20 @@ export default function HowToPlay() {
 
           <Card className="bg-card/50 border-primary/20">
             <CardContent className="p-6 space-y-3">
-              <h2 className="text-lg font-bold text-secondary font-mono uppercase">06 :: Campaign</h2>
+              <h2 className="text-lg font-bold text-secondary font-mono uppercase">06 :: Theater Command</h2>
               <p className="text-sm leading-relaxed">
-                Twenty operations stretch from Cadet Voss to NULL. Early missions teach economy and
-                multi-base defense. Mid campaign introduces Gun Pods, Dummy Bases, and ICBM Silos.
-                Tunnel and ecology systems unlock as optional branches once the classic fantasy is secure.
+                <b className="text-primary">NEW CAMPAIGN</b> opens{" "}
+                <b className="text-cyan-300">Theater Command</b> — a Pacific sector map of twenty
+                operations from Cadet Voss to NULL. Nodes read{" "}
+                <b className="text-emerald-300">Available</b>,{" "}
+                <b className="text-cyan-300">Secured</b>, or{" "}
+                <b className="text-slate-400">Classified</b>. Select a sector to open the combat
+                briefing; Mission List remains a fallback roster.
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Early sectors teach economy and multi-base defense. Mid campaign brings Gun Pods,
+                Dummy Bases, and ICBM Silos. Tunnel and ecology systems unlock as optional branches
+                once classic Metal Marines doctrine is secure.
               </p>
             </CardContent>
           </Card>
