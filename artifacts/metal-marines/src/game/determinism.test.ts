@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { BUILDINGS, GRID_H, GRID_W } from "./constants";
 import { aiAttackGraceSeconds, aiEcoPhaseEndsAt, stepGame } from "./engine";
 import { findPath, terrainMoveCost } from "./pathfinding";
-import { hashRuntimeFrame } from "./replay";
+import { hashRuntimeFrame, recordReplaySession, verifyReplaySnapshot } from "./replay";
 import { createMissionRuntime } from "./runtimeFactory";
 import { hashSeed, randomFloatFromSeed } from "./rng";
 import type { MissionDef, RuntimeState, Tile } from "./types";
@@ -53,7 +53,7 @@ const makeState = (): RuntimeState => ({
     memory: { seenPlayerBuildings: {}, aaProbeScore: 0, lastProbeAt: -999 },
   },
   stats: { missilesFired: 0, marinesDeployed: 0, buildingsLost: 0, buildingsDestroyed: 0, environmentalActions: 0 },
-  replay: { frame: 0, commands: [], hashes: [] },
+  replay: { frame: 0, seed: hashSeed("test"), commands: [], hashes: [] },
   shake: 0,
   playerIsland: makeTiles(),
   enemyIsland: makeTiles(),
@@ -329,6 +329,40 @@ assert.ok(
   const h1 = hashRuntimeFrame(state);
   assert.equal(h1, hashRuntimeFrame(state), "post-AA gunship hash stays stable");
   assert.notEqual(h0, h1, "AA engagement should change runtime hash (damage/cooldown)");
+}
+
+// --- Replay export + hash-verify stub (partial multiplayer/replay foundation) ---
+{
+  const mission = idleMission("replay-verify", 1, 0.1, 0.8);
+  const tickDt = 1 / 30;
+  const { snapshot } = recordReplaySession(mission, {
+    tickDt,
+    frames: 180,
+    schedule: [
+      { frame: 5, type: "SET_FACTORY_DOCTRINE", payload: { doctrine: "HOLD" } },
+      { frame: 10, type: "BUILD", payload: { type: "ENERGY_PLANT", x: 4, y: 5 } },
+      { frame: 20, type: "BUILD", payload: { type: "SUPPLY_DEPOT", x: 6, y: 5 } },
+      { frame: 40, type: "SET_VIEW_LAYER", payload: { layer: "UNDERGROUND" } },
+      { frame: 50, type: "SET_VIEW_LAYER", payload: { layer: "SURFACE" } },
+      { frame: 60, type: "SET_GUNSHIP_PRIORITY", payload: { priority: "AA" } },
+    ],
+  });
+  assert.ok(snapshot.commands.length >= 4, "session should record scheduled player commands");
+  assert.ok(snapshot.hashes.length >= 2, "session should record periodic frame hashes");
+  assert.equal(snapshot.tickDt, tickDt, "snapshot stores tickDt for offline verify");
+
+  const verified = verifyReplaySnapshot(mission, snapshot, { tickDt });
+  assert.equal(verified.ok, true, "re-applied commands must match recorded frame hashes");
+  assert.ok(verified.framesChecked >= 2, "verify should check multiple hash frames");
+
+  // Tamper with a hash → verify must fail
+  const tampered = {
+    ...snapshot,
+    hashes: snapshot.hashes.map((h, i) => (i === 0 ? { ...h, hash: "deadbeef" } : h)),
+  };
+  const failed = verifyReplaySnapshot(mission, tampered, { tickDt });
+  assert.equal(failed.ok, false, "tampered hash must fail verify");
+  assert.ok(failed.firstMismatch, "tamper should report first mismatch");
 }
 
 console.log("game determinism checks passed");

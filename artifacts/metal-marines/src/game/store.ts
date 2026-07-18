@@ -22,12 +22,11 @@ import {
 import { createMissionRuntime } from "./runtimeFactory";
 import { GRID_H, GRID_W } from "./constants";
 import { hashSeed } from "./rng";
-import { createReplayFrameHash } from "./replay";
+import { createReplayFrameHash, REPLAY_HASH_INTERVAL } from "./replay";
 import { getMission, MISSIONS } from "@/data/missions";
 
 const PROGRESS_KEY = "mm2026.progress.v1";
 const SAVE_KEY = "mm2026.save.v1";
-const REPLAY_HASH_INTERVAL = 60;
 
 interface Progress {
   cleared: string[];
@@ -151,6 +150,9 @@ export const useGame = create<Store>((set, get) => ({
   selectBuild: (t) => {
     const rt = get().runtime;
     if (!rt) return;
+    if (rt.selectedBuild !== t) {
+      recordReplayCommand(rt, { type: "SELECT_BUILD", payload: { type: t } });
+    }
     rt.selectedBuild = t;
     rt.selectedWeapon = null;
     set({ runtime: { ...rt } });
@@ -159,6 +161,9 @@ export const useGame = create<Store>((set, get) => ({
   selectWeapon: (t) => {
     const rt = get().runtime;
     if (!rt) return;
+    if (rt.selectedWeapon !== t) {
+      recordReplayCommand(rt, { type: "SELECT_WEAPON", payload: { type: t } });
+    }
     rt.selectedWeapon = t;
     rt.selectedBuild = null;
     set({ runtime: { ...rt } });
@@ -305,8 +310,9 @@ export const useGame = create<Store>((set, get) => ({
       parsed.runtime.terrainMutations ??= [];
       parsed.runtime.stats ??= {};
       parsed.runtime.stats.environmentalActions ??= 0;
-      parsed.runtime.replay ??= { frame: 0, commands: [], hashes: [] };
+      parsed.runtime.replay ??= { frame: 0, seed: 0, commands: [], hashes: [] };
       parsed.runtime.replay.frame ??= 0;
+      parsed.runtime.replay.seed ??= parsed.runtime.rngSeed ?? 0;
       parsed.runtime.replay.commands ??= [];
       parsed.runtime.replay.hashes ??= [];
       parsed.runtime.playerIsland ??= m.playerIsland;

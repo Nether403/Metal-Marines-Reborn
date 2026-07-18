@@ -1,12 +1,12 @@
 import type { BuildingType, MissionDef, RuntimeState, Tile } from "./types";
 import { BUILDINGS, GRID_H, GRID_W } from "./constants";
+import { resetEntityIds, uid } from "./engine";
 import { hashSeed } from "./rng";
-
-let _uid = 0;
-const nextId = (p = "b") => `${p}_${++_uid}`;
 
 /** Build a fresh runtime for a mission (shared by store + idle-survival tests). */
 export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
+  // Shared counter with engine.uid so replay verify reproduces the same entity ids.
+  resetEntityIds();
   const fogPlayer = new Array<boolean>(GRID_W * GRID_H).fill(true);
   const fogEnemy = new Array<boolean>(GRID_W * GRID_H).fill(false);
 
@@ -19,7 +19,7 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
   ) => {
     const spec = BUILDINGS[type];
     buildings.push({
-      id: nextId("b"),
+      id: uid("b"),
       type,
       owner: side,
       side,
@@ -68,11 +68,12 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
     });
   const playerIsland = withTunnels(mission.playerIsland as Tile[], mission.playerStartHQ);
   const enemyIsland = withTunnels(mission.enemyIsland as Tile[], mission.enemyStartHQ);
+  const seed = hashSeed(`${mission.id}:${mission.index}:${mission.difficulty}`);
 
   return {
     status: "PLAYING",
     missionId: mission.id,
-    rngSeed: hashSeed(`${mission.id}:${mission.index}:${mission.difficulty}`),
+    rngSeed: seed,
     startedAt: 0,
     elapsed: 0,
     playerFunds: mission.startFunds,
@@ -118,6 +119,7 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
     },
     replay: {
       frame: 0,
+      seed,
       commands: [],
       hashes: [],
     },
