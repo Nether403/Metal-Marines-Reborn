@@ -125,10 +125,10 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
   const playerGunshipCount = state.aircraft.filter((a) => a.owner === "PLAYER" && a.hp > 0).length;
 
   const factoryDoctrines: { id: FactoryDoctrine; label: string; title: string }[] = [
-    { id: "AUTO", label: "Auto", title: "Balanced: garrison APCs first, then gunship assault" },
-    { id: "APC", label: "APC", title: "Prefer garrison APCs only (no gunships)" },
-    { id: "GUNSHIP", label: "Gunship", title: "Prefer gunship assault; APCs only vs invaders" },
-    { id: "HOLD", label: "Hold", title: "Halt Factory unit production" },
+    { id: "AUTO", label: "Auto", title: "Balanced: garrison APCs first, then gunship assault [O]" },
+    { id: "APC", label: "APC", title: "Prefer garrison APCs only (no gunships) [A]" },
+    { id: "GUNSHIP", label: "Gunship", title: "Prefer gunship assault; APCs only vs invaders [S]" },
+    { id: "HOLD", label: "Hold", title: "Halt Factory unit production [H]" },
   ];
 
   const gunshipPriorities: { id: GunshipStrikePriority; label: string; title: string }[] = [
@@ -342,7 +342,11 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                     background: state.selectedMechTier === tier ? "rgba(239,68,68,0.2)" : "rgba(15,23,42,0.6)",
                     color: state.selectedMechTier === tier ? "#fecaca" : "#94a3b8",
                   }}
-                  title={tier === "GUNNER_II" ? "Upgraded Marine (+HP/dmg, premium drop cost)" : "Standard Gunner-I"}
+                  title={
+                    tier === "GUNNER_II"
+                      ? "Upgraded Marine (+HP/dmg, premium drop cost) [X]"
+                      : "Standard Gunner-I [Z]"
+                  }
                 >
                   {tier === "GUNNER_I" ? "Gunner I" : "Gunner II"}
                 </button>
@@ -359,9 +363,11 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
                     color: state.selectedMechWeapon === mode ? "#7dd3fc" : "#94a3b8",
                   }}
                   title={
-                    mode === "NORMAL" ? "Balanced vs Marines and Gun Pods" :
-                    mode === "ANTI_MMR" ? "+50% vs enemy Marines, -50% vs Gun Pods" :
-                    "+50% vs Gun Pods, -50% vs Marines"
+                    mode === "NORMAL"
+                      ? "Balanced vs Marines and Gun Pods [N]"
+                      : mode === "ANTI_MMR"
+                        ? "+50% vs enemy Marines, -50% vs Gun Pods [M]"
+                        : "+50% vs Gun Pods, -50% vs Marines [P]"
                   }
                 >
                   {mode === "ANTI_MMR" ? "Anti-MMR" : mode === "ANTI_POD" ? "Anti-POD" : "Normal"}

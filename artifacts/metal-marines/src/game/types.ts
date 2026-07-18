@@ -163,6 +163,7 @@ export type ReplayCommandType =
   | "INTERCEPT"
   | "SELECT_BUILD"
   | "SELECT_WEAPON"
+  | "SELECT_MECH_TIER"
   | "SET_VIEW_LAYER"
   | "SET_FACTORY_DOCTRINE"
   | "SET_GUNSHIP_PRIORITY";

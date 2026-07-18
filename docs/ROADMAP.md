@@ -64,7 +64,7 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - [x] Factory doctrine + gunship strike priority (fire-mode style)
 - [x] Late campaign: authored m13–m20 choke maps + hard cadence (diff ≥5)
 - [ ] True isometric camera (optional)
-- [~] Multiplayer / replay foundation (command log + EndScreen export + hash-verify + fixed-step live capture + EndScreen command-log viewer; playback UI / netcode later)
+- [~] Multiplayer / replay foundation (command log + EndScreen export + hash-verify + fixed-step live capture + Gunner tier recording; playback UI / netcode later)
 
 ## Validation commands
 

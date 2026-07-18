@@ -183,6 +183,9 @@ export const useGame = create<Store>((set, get) => ({
   selectMechTier: (tier) => {
     const rt = get().runtime;
     if (!rt) return;
+    if (rt.selectedMechTier !== tier) {
+      recordReplayCommand(rt, { type: "SELECT_MECH_TIER", payload: { tier } });
+    }
     rt.selectedMechTier = tier;
     set({ runtime: { ...rt } });
   },

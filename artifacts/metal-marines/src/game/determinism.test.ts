@@ -350,6 +350,8 @@ assert.ok(
     frames: 180,
     schedule: [
       { frame: 5, type: "SET_FACTORY_DOCTRINE", payload: { doctrine: "HOLD" } },
+      { frame: 8, type: "SELECT_MECH_TIER", payload: { tier: "GUNNER_II" } },
+      { frame: 9, type: "SELECT_WEAPON", payload: { mode: "ANTI_POD" } },
       { frame: 10, type: "BUILD", payload: { type: "ENERGY_PLANT", x: 4, y: 5 } },
       { frame: 20, type: "BUILD", payload: { type: "SUPPLY_DEPOT", x: 6, y: 5 } },
       { frame: 40, type: "SET_VIEW_LAYER", payload: { layer: "UNDERGROUND" } },
@@ -360,6 +362,10 @@ assert.ok(
   assert.ok(snapshot.commands.length >= 4, "session should record scheduled player commands");
   assert.ok(snapshot.hashes.length >= 2, "session should record periodic frame hashes");
   assert.equal(snapshot.tickDt, tickDt, "snapshot stores tickDt for offline verify");
+  assert.ok(
+    snapshot.commands.some((c) => c.type === "SELECT_MECH_TIER" && c.payload.tier === "GUNNER_II"),
+    "session should record Gunner II tier selection"
+  );
 
   const verified = verifyReplaySnapshot(mission, snapshot, { tickDt });
   assert.equal(verified.ok, true, "re-applied commands must match recorded frame hashes");
@@ -442,6 +448,14 @@ assert.ok(
       payload: { mode: "ANTI_AIR" },
     }),
     "f5 MECH_MODE ANTI_AIR"
+  );
+  assert.equal(
+    formatReplayCommandLine({
+      frame: 7,
+      type: "SELECT_MECH_TIER",
+      payload: { tier: "GUNNER_II" },
+    }),
+    "f7 MECH_TIER GUNNER_II"
   );
   assert.equal(
     formatReplayCommandLine({

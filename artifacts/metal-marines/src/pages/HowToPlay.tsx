@@ -125,6 +125,8 @@ export default function HowToPlay() {
                 <li>B / F / G / I / D / C — HQ, Factory, Gun Pod, ICBM Silo, Dummy Base, Dummy Cover</li>
                 <li>1–0 and - = [ ] \ — remaining build palette hotkeys</li>
                 <li>Q–Y — strike weapons (ICBM, Dummy, AA, Marine Drop, EMP, Buster)</li>
+                <li>Z / X — Gunner I / Gunner II · N / M / P — Normal / Anti-MMR / Anti-POD</li>
+                <li>O / A / S / H — Factory Auto / APC / Gunship / Hold</li>
               </ul>
             </CardContent>
           </Card>
