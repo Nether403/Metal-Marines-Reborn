@@ -388,10 +388,15 @@ assert.ok(
   assert.equal(totalSteps, 30, "60×(1/60) wall seconds should yield 30 fixed 1/30 steps");
   assert.ok(acc < tickDt, "remainder must stay below one tick");
 
-  // Hitch / tab resume: wallDt capped externally at 0.05; accumulator still caps steps
-  const hitch = advanceFixedStepAccumulator(0, 0.05, tickDt, MAX_FIXED_STEPS_PER_FRAME);
+  // Spiral guard: uncapped wall hitch must clamp to maxSteps and leave ≤1 tick remainder
+  const hitch = advanceFixedStepAccumulator(0, 1.0, tickDt, MAX_FIXED_STEPS_PER_FRAME);
   assert.equal(hitch.steps, MAX_FIXED_STEPS_PER_FRAME, "long hitch must clamp to max steps/frame");
   assert.ok(hitch.accumulator <= tickDt, "post-cap remainder must not spiral");
+
+  // Play clamps wallDt to 0.05 → at most one 1/30 step per rAF (display may be 60Hz)
+  const framed = advanceFixedStepAccumulator(0, 0.05, tickDt);
+  assert.equal(framed.steps, 1, "Play's 50ms wall clamp yields one fixed tick");
+  assert.ok(framed.accumulator < tickDt);
 
   // Live-style: createMissionRuntime + fixed steps + export tickDt must verify
   const mission = idleMission("replay-fixed-live", 1, 0.1, 0.8);
