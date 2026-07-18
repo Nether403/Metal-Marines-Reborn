@@ -267,10 +267,10 @@ def paint_tree_canopy(cd: ImageDraw.ImageDraw, cx: int, cy: int, r: int, lit: bo
 def paint_forest_tile(cell: Image.Image, understory: Image.Image | None = None):
     """Dense canopy forest tile readable at combat zoom (64px)."""
     cd = ImageDraw.Draw(cell)
-    # deep understory bed
+    # near-black understory so crowns pop against grass islands
     for y in range(64):
         t = y / 63
-        c = mix((12, 36, 20, 255), (22, 58, 30, 255), t)
+        c = mix((6, 22, 12, 255), (14, 40, 20, 255), t)
         cd.line([(0, y), (63, y)], fill=c)
 
     # optional hero texture: crush into dark undergrowth, never the sole silhouette
@@ -283,19 +283,19 @@ def paint_forest_tile(cell: Image.Image, understory: Image.Image | None = None):
                 if a < 20:
                     continue
                 # keep greens, darken hard so procedural crowns carry the read
-                nr = max(0, int(r * 0.25 + 8))
-                ng = max(0, int(g * 0.35 + 14))
-                nb = max(0, int(b * 0.22 + 8))
-                upx[x, y] = (nr, ng, nb, min(a, 110))
+                nr = max(0, int(r * 0.18 + 4))
+                ng = max(0, int(g * 0.28 + 8))
+                nb = max(0, int(b * 0.16 + 4))
+                upx[x, y] = (nr, ng, nb, min(a, 90))
         cell.alpha_composite(u)
 
     # brush / fern undergrowth between trunks
-    for i in range(28):
+    for i in range(22):
         bx = (i * 11 + 3) % 60 + 2
         by = (i * 17 + 7) % 58 + 3
-        cd.ellipse([bx, by, bx + 3, by + 2], fill=(20, 72, 34, 200))
+        cd.ellipse([bx, by, bx + 3, by + 2], fill=(14, 52, 24, 200))
         if i % 4 == 0:
-            cd.line([(bx + 1, by + 1), (bx + 1, by - 3)], fill=(36, 96, 44, 160))
+            cd.line([(bx + 1, by + 1), (bx + 1, by - 3)], fill=(28, 80, 36, 160))
 
     # Dense tree crowns — packed, slightly overlapping, clear silhouettes.
     # Order: back (top) to front (bottom) for simple depth.
@@ -320,11 +320,17 @@ def paint_forest_tile(cell: Image.Image, understory: Image.Image | None = None):
     for cx, cy, r, lit in trees:
         paint_tree_canopy(cd, cx, cy, r, lit)
 
+    # dark seams between crowns — critical for "trees not blobs" at distance
+    for i in range(10):
+        sx = (i * 19 + 8) % 56 + 4
+        sy = (i * 13 + 10) % 54 + 5
+        cd.ellipse([sx, sy, sx + 4, sy + 3], fill=(4, 14, 8, 160))
+
     # sparse litter / needles so the floor isn't a flat void in gaps
-    for i in range(18):
+    for i in range(14):
         lx = (i * 13 + 5) % 62
         ly = (i * 19 + 9) % 62
-        cd.point((lx, ly), fill=(90, 110, 50, 140))
+        cd.point((lx, ly), fill=(70, 90, 40, 120))
 
 
 def paint_terrain_cell(img: Image.Image, x0: int, y0: int, kind: str, pavement: Image.Image | None):

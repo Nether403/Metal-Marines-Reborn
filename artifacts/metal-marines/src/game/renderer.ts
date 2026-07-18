@@ -438,6 +438,29 @@ const drawIsland = (
         ctx.fillStyle = `rgba(20,60,30,${0.04 + n * 0.07})`;
         ctx.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
       }
+      // Reinforce forest canopy silhouettes when the atlas is scaled down in the CSS stage
+      if (tile.terrain === "FOREST" && drewTerrain) {
+        const clumps = [
+          [0.28, 0.3, 7],
+          [0.58, 0.26, 8],
+          [0.72, 0.55, 7],
+          [0.36, 0.68, 8],
+          [0.62, 0.78, 6],
+        ] as const;
+        for (const [rx, ry, r] of clumps) {
+          const j = terrainHash(x, y, rx + ry);
+          const cx = px + TILE_PX * rx + (j - 0.5) * 3;
+          const cy = py + TILE_PX * ry + (j - 0.5) * 2;
+          ctx.fillStyle = "rgba(4,14,8,0.35)";
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 1.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "rgba(74,222,128,0.22)";
+          ctx.beginPath();
+          ctx.arc(cx - 1.5, cy - 2, Math.max(2, r * 0.45), 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
       // Animated water shimmer / foam (battlefeel without new assets)
       if (tile.terrain === "WATER") {
         const phase = t * 2.2 + x * 0.7 + y * 0.55;
