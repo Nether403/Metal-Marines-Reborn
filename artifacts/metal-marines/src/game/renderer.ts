@@ -292,9 +292,13 @@ const drawTerrainTransitions = (
         px,
         py,
         edge,
-        terrain === "WATER" ? "rgba(186,230,253,0.34)" : "rgba(250,204,21,0.28)",
-        terrain === "WATER" ? 2 : 4
+        terrain === "WATER" ? "rgba(224,242,254,0.55)" : "rgba(254,240,138,0.45)",
+        terrain === "WATER" ? 2.5 : 5
       );
+      // secondary foam line for remake shoreline read
+      if (terrain !== "WATER") {
+        drawEdgeLine(ctx, px, py, edge, "rgba(255,255,255,0.22)", 1.5);
+      }
       continue;
     }
 
@@ -399,14 +403,22 @@ const drawIsland = (
       if (!drewTerrain) {
         drawTerrainFallback(ctx, tile, px, py, x, y, t);
       }
+      // Animated water shimmer / foam (battlefeel without new assets)
+      if (tile.terrain === "WATER") {
+        const phase = t * 2.2 + x * 0.7 + y * 0.55;
+        ctx.fillStyle = `rgba(186,230,253,${0.08 + 0.07 * (0.5 + 0.5 * Math.sin(phase))})`;
+        ctx.fillRect(px + 6, py + 10 + ((Math.sin(phase) + 1) * 6), TILE_PX - 18, 2);
+        ctx.fillStyle = `rgba(125,211,252,${0.06 + 0.05 * (0.5 + 0.5 * Math.cos(phase * 1.3))})`;
+        ctx.fillRect(px + 10, py + 28 + ((Math.cos(phase) + 1) * 5), TILE_PX - 22, 2);
+      }
       drawTerrainTransitions(ctx, tiles, x, y, px, py, tile.terrain);
 
-      // Soft pad seams (pavement tiles) — keep quieter than old neon grid
+      // Soft seams — quieter than old neon grid
       ctx.strokeStyle =
         tile.terrain === "WATER"
           ? "rgba(125,211,252,0.1)"
           : tile.terrain === "GRASS"
-            ? "rgba(15,23,42,0.22)"
+            ? "rgba(15,23,42,0.16)"
             : "rgba(34,197,94,0.08)";
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 0.5, py + 0.5, TILE_PX - 1, TILE_PX - 1);
@@ -453,9 +465,10 @@ const drawIsland = (
         if (!fog[y * GRID_W + x]) {
           const px = ox + x * TILE_PX;
           const py = y * TILE_PX;
-          ctx.fillStyle = "rgba(2,6,23,0.86)";
+          // Softer fog — keeps hostile island shape readable like classic MM radar fog
+          ctx.fillStyle = "rgba(2,6,23,0.72)";
           ctx.fillRect(px, py, TILE_PX, TILE_PX);
-          ctx.strokeStyle = "rgba(56,189,248,0.07)";
+          ctx.strokeStyle = "rgba(56,189,248,0.1)";
           ctx.strokeRect(px + 0.5, py + 0.5, TILE_PX - 1, TILE_PX - 1);
         }
       }
