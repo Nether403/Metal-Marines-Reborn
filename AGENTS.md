@@ -40,7 +40,7 @@ and record why in Memories.
       clearly (verify recolor quality at combat scale).
 
 #### P2 — Later / optional
-8. [ ] Sample-based SFX banks (launch / explode / land) hot-swapped behind `sfx()`.
+8. [x] Sample-based SFX banks (launch / explode / land) hot-swapped behind `sfx()`.
 9. [ ] Vehicles / aircraft sprites (gameplay can stub later).
 10. [ ] True isometric camera (large refactor — only after P0 feels solid).
 11. [ ] Multiplayer / replay foundation.

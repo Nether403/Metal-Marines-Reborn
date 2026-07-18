@@ -15,6 +15,7 @@ import {
 } from "@/game/constants";
 import { worldToTile, inIsland } from "@/game/engine";
 import { preloadGameSprites } from "@/game/sprites";
+import { preloadSfxSamples } from "@/lib/sfx";
 import type { Owner } from "@/game/types";
 import ResourceBar from "@/components/hud/ResourceBar";
 import BuildPalette from "@/components/hud/BuildPalette";
@@ -98,6 +99,7 @@ export default function Play() {
 
   useEffect(() => {
     void preloadGameSprites();
+    void preloadSfxSamples();
   }, []);
 
   // Game loop

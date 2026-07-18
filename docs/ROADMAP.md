@@ -57,7 +57,7 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - [x] Ecology heroes: Seismic, Destabilizer, Weather, Biosphere (+ enemy recolors)
 - [x] Richer layered synthesized SFX (sample hot-swap still later)
 - [x] Terrain sheet slices + EMP/Dummy heroes + denser HQ/airspace read
-- [ ] Optional: real sample banks for launch / explode / land
+- [x] Sample banks for launch / explode / land hot-swapped behind `sfx()`
 - See `AGENTS.md` backlog for Automation-driven next picks.
 - [ ] True isometric camera (optional)
 - [ ] Vehicles / aircraft

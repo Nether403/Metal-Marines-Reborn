@@ -1,4 +1,4 @@
-/** Layered synthesized SFX — API is stable for later sample hot-swap. */
+/** Combat SFX — sample banks hot-swapped when present, synth fallback otherwise. */
 
 const audioCtx: AudioContext | null =
   typeof window !== "undefined" && "AudioContext" in window
@@ -12,6 +12,64 @@ export const setMuted = (v: boolean) => {
 
 const resume = () => {
   if (audioCtx?.state === "suspended") void audioCtx.resume();
+};
+
+const assetBasePath = (): string => {
+  const base = import.meta.env.BASE_URL ?? "/";
+  return base.endsWith("/") ? base.slice(0, -1) : base;
+};
+
+/** Filenames under public/game-assets/sfx/ — drop-in replace to hot-swap. */
+const SAMPLE_FILES: Record<string, string> = {
+  launch: "launch.wav",
+  explosion: "explosion.wav",
+  land: "land.wav",
+};
+
+const sampleBuffers = new Map<string, AudioBuffer>();
+let sampleLoad: Promise<void> | null = null;
+
+const loadSampleBank = async (name: string, file: string): Promise<void> => {
+  if (!audioCtx) return;
+  try {
+    const url = `${assetBasePath()}/game-assets/sfx/${file}`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const raw = await res.arrayBuffer();
+    const buf = await audioCtx.decodeAudioData(raw.slice(0));
+    sampleBuffers.set(name, buf);
+  } catch {
+    /* keep synth fallback */
+  }
+};
+
+/** Prefetch launch / explosion / land WAVs. Safe to call multiple times. */
+export const preloadSfxSamples = (): Promise<void> => {
+  if (!sampleLoad) {
+    sampleLoad = Promise.all(
+      Object.entries(SAMPLE_FILES).map(([name, file]) => loadSampleBank(name, file))
+    ).then(() => undefined);
+  }
+  return sampleLoad;
+};
+
+const playSample = (name: string, gain = 0.85): boolean => {
+  if (!audioCtx || muted) return false;
+  const buf = sampleBuffers.get(name);
+  if (!buf) return false;
+  resume();
+  try {
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    const g = audioCtx.createGain();
+    g.gain.value = gain;
+    src.connect(g);
+    g.connect(audioCtx.destination);
+    src.start();
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 const tone = (
@@ -45,7 +103,12 @@ const tone = (
   }
 };
 
-const noiseBurst = (duration: number, gain = 0.08, filterFreq = 800, type: BiquadFilterType = "lowpass") => {
+const noiseBurst = (
+  duration: number,
+  gain = 0.08,
+  filterFreq = 800,
+  type: BiquadFilterType = "lowpass"
+) => {
   if (!audioCtx || muted) return;
   resume();
   try {
@@ -73,7 +136,7 @@ const noiseBurst = (duration: number, gain = 0.08, filterFreq = 800, type: Biqua
   }
 };
 
-export const sfx = (name: string) => {
+const synthFallback = (name: string) => {
   switch (name) {
     case "place_building":
       tone(520, 0.05, "triangle", 0.03);
@@ -126,4 +189,10 @@ export const sfx = (name: string) => {
       tone(85, 0.055, "square", 0.028);
       break;
   }
+};
+
+export const sfx = (name: string) => {
+  // Prefer baked/hot-swapped samples for core combat beats.
+  if (name in SAMPLE_FILES && playSample(name)) return;
+  synthFallback(name);
 };
