@@ -30,6 +30,8 @@ const makeState = (): RuntimeState => ({
   buildings: [],
   projectiles: [],
   mechs: [],
+  vehicles: [],
+  aircraft: [],
   particles: [],
   fogPlayer: [],
   fogEnemy: [],

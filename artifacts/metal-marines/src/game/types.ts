@@ -96,6 +96,30 @@ export interface Mech {
   weaponMode: MechWeaponMode;
 }
 
+/** Ground vehicle stub — sprites ready; simulation may spawn later. */
+export interface Vehicle {
+  id: string;
+  owner: Owner;
+  side: Owner;
+  pos: Position;
+  hp: number;
+  maxHp: number;
+  state: "IDLE" | "MOVING" | "DEAD";
+  facing?: number;
+}
+
+/** Aircraft / gunship stub — sprites ready; simulation may spawn later. */
+export interface Aircraft {
+  id: string;
+  owner: Owner;
+  side: Owner;
+  pos: Position;
+  hp: number;
+  maxHp: number;
+  state: "IDLE" | "FLYING" | "DEAD";
+  facing?: number;
+}
+
 export interface Particle {
   id: string;
   side: Owner;
@@ -231,6 +255,9 @@ export interface RuntimeState {
   buildings: Building[];
   projectiles: Projectile[];
   mechs: Mech[];
+  /** Stub lists — atlas sprites exist; engine does not spawn yet. */
+  vehicles: Vehicle[];
+  aircraft: Aircraft[];
   particles: Particle[];
   playerIsland: Tile[];
   enemyIsland: Tile[];
