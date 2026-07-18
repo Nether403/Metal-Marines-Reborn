@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import type { RuntimeState, MissionDef, CommanderProfile } from "@/game/types";
+import type { RuntimeState, MissionDef, CommanderProfile, ReplayCommand } from "@/game/types";
 import { useGame } from "@/game/store";
 import { COMMANDERS } from "@/data/commanders";
 import { MISSIONS } from "@/data/missions";
-import { createReplaySnapshot } from "@/game/replay";
+import { createReplaySnapshot, formatReplayCommandLine } from "@/game/replay";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export default function EndScreen({
   state,
@@ -18,10 +20,12 @@ export default function EndScreen({
   const markCleared = useGame((s) => s.markCleared);
   const cmd: CommanderProfile = COMMANDERS[mission.commanderId];
   const win = state.status === "VICTORY";
+  const [logOpen, setLogOpen] = useState(false);
 
   if (win) markCleared(mission.id);
 
   const nextMission = MISSIONS[mission.index] ?? null;
+  const commands = state.replay.commands;
 
   const exportReplay = () => {
     const snapshot = createReplaySnapshot(
@@ -42,7 +46,7 @@ export default function EndScreen({
 
   return (
     <div className="absolute inset-0 z-40 bg-background/95 backdrop-blur-sm flex items-center justify-center font-mono p-4">
-      <div className="max-w-xl w-full border border-primary/40 bg-card/80 p-8 rounded shadow-[0_0_30px_rgba(34,197,94,0.25)]">
+      <div className="max-w-xl w-full border border-primary/40 bg-card/80 p-8 rounded shadow-[0_0_30px_rgba(34,197,94,0.25)] max-h-[min(92vh,880px)] overflow-y-auto">
         <div
           className={`text-5xl font-black tracking-tighter mb-2 ${
             win ? "text-primary" : "text-destructive"
@@ -61,8 +65,11 @@ export default function EndScreen({
           <Stat label="Buildings Lost" v={state.stats.buildingsLost} />
           <Stat label="Result" v={win ? "VICTORY" : "DEFEAT"} />
           <Stat label="Replay Frames" v={state.replay.frame} />
-          <Stat label="Replay Commands" v={state.replay.commands.length} />
+          <Stat label="Replay Commands" v={commands.length} />
         </div>
+
+        <CommandLogPanel commands={commands} open={logOpen} onOpenChange={setLogOpen} />
+
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
@@ -100,6 +107,55 @@ export default function EndScreen({
         </div>
       </div>
     </div>
+  );
+}
+
+function CommandLogPanel({
+  commands,
+  open,
+  onOpenChange,
+}: {
+  commands: ReplayCommand[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange} className="mb-6">
+      <div className="flex items-center justify-between gap-2 border border-primary/20 bg-black/40 px-3 py-2">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          Command Log
+        </span>
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="font-mono text-xs h-7 px-2 text-primary hover:text-primary"
+          >
+            {open ? "HIDE" : "SHOW"} ({commands.length})
+          </Button>
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent>
+        <div
+          className="mt-0 max-h-48 overflow-y-auto border border-t-0 border-primary/20 bg-black/60 px-3 py-2 text-[11px] leading-relaxed text-foreground/90"
+          role="log"
+          aria-label="Replay command log"
+        >
+          {commands.length === 0 ? (
+            <div className="text-muted-foreground italic">No player commands recorded.</div>
+          ) : (
+            <ul className="space-y-0.5 font-mono">
+              {commands.map((c, i) => (
+                <li key={`${c.frame}-${c.type}-${i}`} className="whitespace-nowrap">
+                  {formatReplayCommandLine(c)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

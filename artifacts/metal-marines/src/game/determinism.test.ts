@@ -7,6 +7,7 @@ import {
   createReplayFrameHash,
   createReplaySnapshot,
   DEFAULT_REPLAY_TICK_DT,
+  formatReplayCommandLine,
   hashRuntimeFrame,
   MAX_FIXED_STEPS_PER_FRAME,
   recordReplaySession,
@@ -418,6 +419,46 @@ assert.ok(
   const verified = verifyReplaySnapshot(mission, snapshot);
   assert.equal(verified.ok, true, "fixed-tickDt live capture must verify offline");
   assert.ok(verified.framesChecked >= 1, "verify should check at least one hash frame");
+}
+
+// --- EndScreen command-log formatter (readable lines, no scrubber) ---
+{
+  assert.equal(
+    formatReplayCommandLine({ frame: 12, type: "BUILD", payload: { type: "ENERGY", x: 3, y: 4 } }),
+    "f12 BUILD ENERGY @ 3,4"
+  );
+  assert.equal(
+    formatReplayCommandLine({
+      frame: 40,
+      type: "FIRE",
+      payload: { type: "MISSILE", wx: 10.1234, wy: 8.9876 },
+    }),
+    "f40 FIRE MISSILE → 10.123,8.988"
+  );
+  assert.equal(
+    formatReplayCommandLine({
+      frame: 5,
+      type: "SELECT_WEAPON",
+      payload: { mode: "ANTI_AIR" },
+    }),
+    "f5 MECH_MODE ANTI_AIR"
+  );
+  assert.equal(
+    formatReplayCommandLine({
+      frame: 99,
+      type: "SET_FACTORY_DOCTRINE",
+      payload: { doctrine: "GUNSHIP" },
+    }),
+    "f99 FACTORY GUNSHIP"
+  );
+  assert.equal(
+    formatReplayCommandLine({
+      frame: 1,
+      type: "INTERCEPT",
+      payload: { targetId: "p7", wx: 2, wy: 3 },
+    }),
+    "f1 INTERCEPT p7 ← 2,3"
+  );
 }
 
 console.log("game determinism checks passed");

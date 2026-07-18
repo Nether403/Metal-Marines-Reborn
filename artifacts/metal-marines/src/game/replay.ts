@@ -178,6 +178,33 @@ export const createReplaySnapshot = (
   hashes: [...hashes],
 });
 
+/** Human-readable one-liner for EndScreen command-log (no canvas scrubber). */
+export const formatReplayCommandLine = (command: ReplayCommand): string => {
+  const f = `f${command.frame}`;
+  const { type, payload } = command;
+  switch (type) {
+    case "BUILD":
+      return `${f} BUILD ${payload.type ?? "?"} @ ${payload.x},${payload.y}`;
+    case "FIRE":
+      return `${f} FIRE ${payload.type ?? "?"} → ${stableNumber(Number(payload.wx))},${stableNumber(Number(payload.wy))}`;
+    case "INTERCEPT":
+      return `${f} INTERCEPT ${payload.targetId ?? "?"} ← ${stableNumber(Number(payload.wx))},${stableNumber(Number(payload.wy))}`;
+    case "SELECT_BUILD":
+      return `${f} SELECT_BUILD ${payload.type ?? "none"}`;
+    case "SELECT_WEAPON":
+      if (payload.mode != null && payload.mode !== "") return `${f} MECH_MODE ${payload.mode}`;
+      return `${f} SELECT_WEAPON ${payload.type ?? "none"}`;
+    case "SET_VIEW_LAYER":
+      return `${f} VIEW ${payload.layer ?? "?"}`;
+    case "SET_FACTORY_DOCTRINE":
+      return `${f} FACTORY ${payload.doctrine ?? "?"}`;
+    case "SET_GUNSHIP_PRIORITY":
+      return `${f} GUNSHIP ${payload.priority ?? "?"}`;
+    default:
+      return `${f} ${type}`;
+  }
+};
+
 /** Apply one recorded player command to a runtime (no React / store). */
 export const applyReplayCommand = (state: RuntimeState, command: ReplayCommand): boolean => {
   const { type, payload } = command;
