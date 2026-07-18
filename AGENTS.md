@@ -44,7 +44,9 @@ and record why in Memories.
 9. [x] Vehicles / aircraft sprites (gameplay can stub later).
    Follow-up: Factory spawns garrison APCs + assault gunships (this PR).
 10. [ ] True isometric camera (large refactor — only after P0 feels solid).
-11. [ ] Multiplayer / replay foundation.
+11. [~] Multiplayer / replay foundation — recording + EndScreen JSON export +
+    offline hash-verify stub (apply commands / fixed tickDt). In-mission
+    playback UI and netcode still deferred.
 
 Also done outside numbered art backlog (ROADMAP Phase 4): AI opening grace so
 idle early missions are not instant defeat — attack gate + longer ECO phase.

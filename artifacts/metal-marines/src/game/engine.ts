@@ -86,6 +86,10 @@ import { sfx } from "../lib/sfx";
 
 let _id = 0;
 export const uid = (p = "x") => `${p}_${++_id}`;
+/** Reset entity id counter so mission start / replay verify stay deterministic. */
+export const resetEntityIds = () => {
+  _id = 0;
+};
 
 const rng = (state: RuntimeState): number => {
   const value = randomFloatFromSeed(state.rngSeed);

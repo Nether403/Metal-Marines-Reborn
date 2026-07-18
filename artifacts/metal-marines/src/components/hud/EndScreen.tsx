@@ -4,6 +4,7 @@ import type { RuntimeState, MissionDef, CommanderProfile } from "@/game/types";
 import { useGame } from "@/game/store";
 import { COMMANDERS } from "@/data/commanders";
 import { MISSIONS } from "@/data/missions";
+import { createReplaySnapshot, DEFAULT_REPLAY_TICK_DT } from "@/game/replay";
 
 export default function EndScreen({
   state,
@@ -21,6 +22,24 @@ export default function EndScreen({
   if (win) markCleared(mission.id);
 
   const nextMission = MISSIONS[mission.index] ?? null;
+
+  const exportReplay = () => {
+    const snapshot = createReplaySnapshot(
+      state,
+      state.replay.commands,
+      state.replay.hashes,
+      // Live play uses variable rAF dt; export nominal tick for tooling / future fixed-step capture.
+      DEFAULT_REPLAY_TICK_DT
+    );
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    a.href = url;
+    a.download = `mm-replay-${mission.id}-${stamp}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="absolute inset-0 z-40 bg-background/95 backdrop-blur-sm flex items-center justify-center font-mono p-4">
@@ -42,6 +61,8 @@ export default function EndScreen({
           <Stat label="Enemy Buildings Destroyed" v={state.stats.buildingsDestroyed} />
           <Stat label="Buildings Lost" v={state.stats.buildingsLost} />
           <Stat label="Result" v={win ? "VICTORY" : "DEFEAT"} />
+          <Stat label="Replay Frames" v={state.replay.frame} />
+          <Stat label="Replay Commands" v={state.replay.commands.length} />
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -50,6 +71,14 @@ export default function EndScreen({
             onClick={() => restart(mission.id)}
           >
             REPLAY
+          </Button>
+          <Button
+            variant="outline"
+            className="font-mono border-primary/40"
+            onClick={exportReplay}
+            title="Download command log + frame hashes as JSON (hash-verify needs fixed tickDt)"
+          >
+            EXPORT REPLAY JSON
           </Button>
           {win && nextMission && (
             <Button

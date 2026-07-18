@@ -183,6 +183,8 @@ export interface ReplaySnapshot {
   version: 1;
   missionId: string | null;
   seed: number;
+  /** Fixed sim step used when recording; required for offline hash verify. */
+  tickDt: number;
   commands: ReplayCommand[];
   hashes: ReplayFrameHash[];
 }
@@ -324,6 +326,8 @@ export interface RuntimeState {
   };
   replay: {
     frame: number;
+    /** Initial rng seed at mission start (for offline verify). */
+    seed: number;
     commands: ReplayCommand[];
     hashes: ReplayFrameHash[];
   };
