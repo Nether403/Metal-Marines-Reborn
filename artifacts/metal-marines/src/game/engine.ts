@@ -1407,16 +1407,44 @@ const tickAircraft = (state: RuntimeState, dt: number) => {
         if (distance(bw.x, bw.y, a.pos.x, a.pos.y) <= r) {
           b.cooldown = 1 / (BUILDINGS.AA_GUN.fireRate ?? 1.2);
           a.hp -= AIRCRAFT_AA_DAMAGE;
+          // Muzzle bloom at the AA pad
           state.particles.push({
             id: uid("pa"),
             side: b.side,
-            pos: { x: bw.x, y: bw.y },
-            vx: (a.pos.x - bw.x) * 8,
-            vy: (a.pos.y - bw.y) * 8,
+            pos: { x: bw.x, y: bw.y - 4 },
+            vx: 0,
+            vy: -8,
             life: 0,
-            maxLife: 0.1,
+            maxLife: 0.12,
+            color: "#e0f2fe",
+            size: 5,
+            fx: "muzzle",
+          });
+          // Thick cyan tracer toward the gunship (readable at combat zoom)
+          state.particles.push({
+            id: uid("pa"),
+            side: b.side,
+            pos: { x: bw.x, y: bw.y - 2 },
+            vx: (a.pos.x - bw.x) * 5.5,
+            vy: (a.pos.y - bw.y) * 5.5,
+            life: 0,
+            maxLife: 0.22,
             color: "#7dd3fc",
-            size: 1.2,
+            size: 3.5,
+            kind: "tracer",
+          });
+          // Impact spark on the craft
+          state.particles.push({
+            id: uid("pa"),
+            side: a.side,
+            pos: { x: a.pos.x, y: a.pos.y - 6 },
+            vx: (a.pos.x - bw.x) * 0.4,
+            vy: (a.pos.y - bw.y) * 0.4 - 20,
+            life: 0,
+            maxLife: 0.18,
+            color: "#f8fafc",
+            size: 4,
+            kind: "spark",
           });
           break;
         }
@@ -1458,17 +1486,44 @@ const tickAircraft = (state: RuntimeState, dt: number) => {
       if (a.attackCooldown <= 0) {
         a.attackCooldown = AIRCRAFT_ATTACK_COOLDOWN;
         target.hp -= AIRCRAFT_DAMAGE;
+        // Nose muzzle flash
         state.particles.push({
           id: uid("pa"),
           side: target.side,
-          pos: { x: a.pos.x, y: a.pos.y },
-          vx: (tw.x - a.pos.x) * 6,
-          vy: (tw.y - a.pos.y) * 6,
+          pos: { x: a.pos.x, y: a.pos.y - 6 },
+          vx: 0,
+          vy: -6,
           life: 0,
-          maxLife: 0.16,
-          color: "#fbbf24",
-          size: 2,
+          maxLife: 0.14,
+          color: "#fde68a",
+          size: 6,
           fx: "muzzle",
+        });
+        // Amber strafe tracer toward the building
+        state.particles.push({
+          id: uid("pa"),
+          side: target.side,
+          pos: { x: a.pos.x, y: a.pos.y - 4 },
+          vx: (tw.x - a.pos.x) * 5,
+          vy: (tw.y - a.pos.y) * 5,
+          life: 0,
+          maxLife: 0.2,
+          color: "#fbbf24",
+          size: 3.2,
+          kind: "tracer",
+        });
+        // Ground impact spark on the target pad (no RNG — keep sim deterministic)
+        state.particles.push({
+          id: uid("pa"),
+          side: target.side,
+          pos: { x: tw.x, y: tw.y },
+          vx: (a.pos.x - tw.x) * 0.35,
+          vy: -42,
+          life: 0,
+          maxLife: 0.22,
+          color: "#fb923c",
+          size: 4.5,
+          kind: "spark",
         });
         if (target.hp <= 0) {
           spawnExplosion(state, target.side, tw.x, tw.y, true);
@@ -1771,8 +1826,28 @@ const detectIncoming = (state: RuntimeState, dt: number) => {
       text: `INCOMING ${incoming[0].type === "TRANSPORT_POD" ? "TRANSPORT POD" : incoming[0].type}`,
       level: "crit",
       ts: 3,
+      category: "incoming",
     });
     alertCooldown = 2;
+    sfx("alert");
+    return;
+  }
+  // Hostile Factory gunships over the player island (no projectile signature)
+  const hostileGunship = state.aircraft.find(
+    (a) => a.owner === "ENEMY" && a.side === "PLAYER" && a.state !== "DEAD" && a.hp > 0
+  );
+  if (hostileGunship) {
+    state.alerts.push({
+      id: uid("a"),
+      text: "HOSTILE GUNSHIP OVER BASE",
+      level: "crit",
+      ts: 3,
+      category: "combat",
+      side: "PLAYER",
+      worldPos: { ...hostileGunship.pos },
+      suggestion: "AA Batteries engage automatically — reinforce AA coverage.",
+    });
+    alertCooldown = 2.5;
     sfx("alert");
   }
 };

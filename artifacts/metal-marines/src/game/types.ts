@@ -137,6 +137,8 @@ export interface Particle {
   size: number;
   /** Optional flipbook FX key prefix (explosion/smoke/muzzle). */
   fx?: "explosion" | "smoke" | "muzzle";
+  /** Streak/tracer or spark instead of default radial blast (AA↔gunship readability). */
+  kind?: "blast" | "tracer" | "spark";
 }
 
 export interface TerrainMutation {

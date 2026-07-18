@@ -159,6 +159,48 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
       ctx.shadowBlur = 0;
     }
 
+    // Factory garrison APCs on the home island
+    for (const v of state.vehicles) {
+      if (v.side !== "PLAYER" || v.state === "DEAD" || v.hp <= 0) continue;
+      const tx = Math.floor(v.pos.x / TILE_PX);
+      const tyPos = Math.floor(v.pos.y / TILE_PX);
+      if (tx < 0 || tyPos < 0 || tx >= GRID_W || tyPos >= GRID_H) continue;
+      const px = ox + (tx + 0.5) * tw;
+      const py = oy + (tyPos + 0.5) * th;
+      ctx.fillStyle = v.owner === "PLAYER" ? "rgba(248,113,113,0.9)" : "rgba(245,158,11,0.95)";
+      ctx.fillRect(px - 2, py - 1.5, 4, 3);
+    }
+
+    // Gunships over the player island (friendly = red diamond, hostile = amber + pulse)
+    for (const a of state.aircraft) {
+      if (a.side !== "PLAYER" || a.state === "DEAD" || a.hp <= 0) continue;
+      const tx = Math.floor(a.pos.x / TILE_PX);
+      const tyPos = Math.floor(a.pos.y / TILE_PX);
+      if (tx < 0 || tyPos < 0 || tx >= GRID_W || tyPos >= GRID_H) continue;
+      const px = ox + (tx + 0.5) * tw;
+      const py = oy + (tyPos + 0.5) * th;
+      const hostile = a.owner === "ENEMY";
+      const color = hostile ? "245,158,11" : "56,189,248";
+      if (hostile) {
+        ctx.strokeStyle = `rgba(${color},${0.55 + 0.4 * pulse})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(px, py, 4.5 + pulse * 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = `rgba(${color},0.95)`;
+      ctx.shadowColor = `rgba(${color},0.7)`;
+      ctx.shadowBlur = hostile ? 5 : 3;
+      ctx.beginPath();
+      ctx.moveTo(px, py - 3.5);
+      ctx.lineTo(px + 3, py);
+      ctx.lineTo(px, py + 3.5);
+      ctx.lineTo(px - 3, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
     // Radar sweep overlay (when radar online)
     if (hasRadar) {
       const sweep = ((performance.now() / 1000) % 3) * ((Math.PI * 2) / 3);
@@ -185,15 +227,19 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
     }
   });
 
-  // Threat ETAs
-  const threats = state.projectiles
+  // Threat ETAs — inbound projectiles + hostile gunships over base
+  const projectileThreats = state.projectiles
     .filter((p) => p.owner === "ENEMY" && p.side === "PLAYER" && !p.intercepted)
     .map((p) => {
       const cur = projectileCurrentPos(p);
       const remaining = Math.hypot(p.targetWX - cur.x, p.targetWY - cur.y);
       const eta = Math.max(0, remaining / Math.max(1, p.speed));
-      return { id: p.id, type: p.type, eta };
-    })
+      return { id: p.id, type: p.type === "TRANSPORT_POD" ? "MECH-POD" : p.type, eta };
+    });
+  const gunshipThreats = state.aircraft
+    .filter((a) => a.owner === "ENEMY" && a.side === "PLAYER" && a.state !== "DEAD" && a.hp > 0)
+    .map((a) => ({ id: a.id, type: "GUNSHIP", eta: 0 }));
+  const threats = [...gunshipThreats, ...projectileThreats]
     .sort((a, b) => a.eta - b.eta)
     .slice(0, 4);
 
@@ -294,10 +340,10 @@ export default function RadarPanel({ state }: { state: RuntimeState }) {
                     <div key={threat.id} className="flex items-center justify-between">
                       <span className="flex items-center gap-1" style={{ color: "var(--hud-player)" }}>
                         <TriangleAlert className="h-2.5 w-2.5" />
-                        {threat.type === "TRANSPORT_POD" ? "MECH-POD" : threat.type}
+                        {threat.type}
                       </span>
                       <span style={{ color: "var(--hud-funds)" }}>
-                        ETA {threat.eta.toFixed(1)}s
+                        {threat.type === "GUNSHIP" ? "OVER BASE" : `ETA ${threat.eta.toFixed(1)}s`}
                       </span>
                     </div>
                   ))}

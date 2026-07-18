@@ -890,6 +890,26 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
     ctx.textAlign = "start";
   }
 
+  // AA pad flash right after engaging missiles/gunships
+  if (b.type === "AA_GUN" && b.cooldown > 0 && b.buildTimeRemaining <= 0) {
+    const maxCd = 1 / (BUILDINGS.AA_GUN.fireRate ?? 1.2);
+    const flash = Math.min(1, b.cooldown / maxCd);
+    if (flash > 0.45) {
+      const a = (flash - 0.45) / 0.55;
+      ctx.save();
+      ctx.strokeStyle = `rgba(125,211,252,${0.35 + a * 0.55})`;
+      ctx.lineWidth = 2 + a * 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy - 2, 14 + a * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(224,242,254,${0.15 + a * 0.35})`;
+      ctx.beginPath();
+      ctx.arc(cx, cy - 6, 4 + a * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // HP bar
   if (b.hp < b.maxHp) {
     const w = 28;
@@ -1195,13 +1215,15 @@ const drawVehicle = (ctx: CanvasRenderingContext2D, v: Vehicle, time: number) =>
   }
 };
 
-/** Draws Factory assault gunships. */
+/** Draws Factory assault gunships — larger + higher altitude so they read airborne vs APCs/mechs. */
 const drawAircraft = (ctx: CanvasRenderingContext2D, a: Aircraft, time: number) => {
   const airborne = a.state === "FLYING";
-  drawEntityShadow(ctx, a.pos.x, a.pos.y + (airborne ? 6 : 2), 14, 5);
+  const bob = airborne ? Math.sin(time * 5.5 + a.pos.x * 0.04) * 2.2 : 0;
+  const altitude = airborne ? 11 + bob : 0;
+  drawEntityShadow(ctx, a.pos.x, a.pos.y + (airborne ? 14 : 2), airborne ? 18 : 12, airborne ? 6 : 4);
   const key = aircraftSpriteKey(a, time);
-  const drew = spriteManager.draw(ctx, key, a.pos.x, a.pos.y - (airborne ? 4 : 0), {
-    scale: (TILE_PX / 64) * 1.5,
+  const drew = spriteManager.draw(ctx, key, a.pos.x, a.pos.y - altitude, {
+    scale: (TILE_PX / 64) * (airborne ? 1.78 : 1.55),
     rotation: a.facing ?? 0,
     alpha: a.state === "DEAD" ? 0.65 : 1,
   });
@@ -1210,11 +1232,22 @@ const drawAircraft = (ctx: CanvasRenderingContext2D, a: Aircraft, time: number) 
     ctx.save();
     ctx.fillStyle = visuals.secondary;
     ctx.beginPath();
-    ctx.moveTo(a.pos.x, a.pos.y - 10);
-    ctx.lineTo(a.pos.x + 14, a.pos.y + 6);
-    ctx.lineTo(a.pos.x - 14, a.pos.y + 6);
+    ctx.moveTo(a.pos.x, a.pos.y - 10 - altitude);
+    ctx.lineTo(a.pos.x + 14, a.pos.y + 6 - altitude);
+    ctx.lineTo(a.pos.x - 14, a.pos.y + 6 - altitude);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
+  }
+  // Rotor wash ring — reinforces "in the air" at combat zoom
+  if (airborne && a.state !== "DEAD") {
+    const wash = 0.35 + 0.25 * Math.sin(time * 14 + a.pos.y * 0.02);
+    ctx.save();
+    ctx.strokeStyle = a.owner === "PLAYER" ? `rgba(248,113,113,${0.2 + wash * 0.25})` : `rgba(245,158,11,${0.22 + wash * 0.25})`;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.ellipse(a.pos.x, a.pos.y - altitude + 2, 16 + wash * 3, 5 + wash, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
   if (a.hp < a.maxHp && a.state !== "DEAD") {
@@ -1236,6 +1269,52 @@ const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
   const lifeRatio = 1 - p.life / p.maxLife;
   const alpha = Math.max(0, lifeRatio);
   const radius = Math.max(1, p.size * lifeRatio);
+
+  // AA↔gunship tracers: streak along velocity instead of a radial blast
+  if (p.kind === "tracer") {
+    const speed = Math.hypot(p.vx, p.vy) || 1;
+    const ux = p.vx / speed;
+    const uy = p.vy / speed;
+    const len = 18 + p.size * 4;
+    const halfW = Math.max(1.2, p.size * 0.45);
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = halfW * 2.2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(p.pos.x - ux * len * 0.15, p.pos.y - uy * len * 0.15);
+    ctx.lineTo(p.pos.x + ux * len, p.pos.y + uy * len);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(248,250,252,0.85)";
+    ctx.lineWidth = halfW;
+    ctx.beginPath();
+    ctx.moveTo(p.pos.x, p.pos.y);
+    ctx.lineTo(p.pos.x + ux * len * 0.7, p.pos.y + uy * len * 0.7);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  if (p.kind === "spark") {
+    ctx.save();
+    ctx.globalAlpha *= alpha;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.pos.x, p.pos.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(p.pos.x - radius * 1.8, p.pos.y);
+    ctx.lineTo(p.pos.x + radius * 1.8, p.pos.y);
+    ctx.moveTo(p.pos.x, p.pos.y - radius * 1.8);
+    ctx.lineTo(p.pos.x, p.pos.y + radius * 1.8);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   ctx.save();
   ctx.globalAlpha *= alpha;
 

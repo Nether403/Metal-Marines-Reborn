@@ -275,4 +275,52 @@ assert.ok(
   assert.equal(locked!.side, "ENEMY", "gunship should target the enemy island");
 }
 
+// --- AA↔gunship readability FX (tracers + sparks, deterministic) ---
+{
+  const mission = idleMission("aa-gunship-fx", 1, 0.1, 0.8);
+  const state = createMissionRuntime(mission);
+  state.buildings.push({
+    id: "aa_home",
+    type: "AA_GUN",
+    side: "PLAYER",
+    owner: "PLAYER",
+    pos: { x: 5, y: 4 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.AA_GUN.maxHp,
+    maxHp: BUILDINGS.AA_GUN.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  // Place a hostile gunship already over the player island
+  state.aircraft.push({
+    id: "hostile_gs",
+    owner: "ENEMY",
+    side: "PLAYER",
+    pos: { x: 5.5 * 64, y: 4.5 * 64 },
+    hp: 95,
+    maxHp: 95,
+    state: "FLYING",
+    facing: 0,
+    attackCooldown: 0.1,
+    targetBuildingId: state.buildings.find((b) => b.type === "HQ" && b.side === "PLAYER")?.id,
+  });
+  const h0 = hashRuntimeFrame(state);
+  for (let t = 0; t < 1.5; t += 0.25) stepGame(state, mission, 0.25);
+  const tracers = state.particles.filter((p) => p.kind === "tracer");
+  assert.ok(tracers.length > 0, "AA↔gunship exchange should spawn readable tracer particles");
+  assert.ok(
+    state.buildings.some((b) => b.id === "aa_home" && b.cooldown > 0),
+    "AA battery should go on cooldown after engaging"
+  );
+  assert.ok(
+    state.alerts.some((a) => a.text.includes("HOSTILE GUNSHIP")),
+    "hostile gunship over base should raise a combat alert"
+  );
+  const h1 = hashRuntimeFrame(state);
+  assert.equal(h1, hashRuntimeFrame(state), "post-AA gunship hash stays stable");
+  assert.notEqual(h0, h1, "AA engagement should change runtime hash (damage/cooldown)");
+}
+
 console.log("game determinism checks passed");

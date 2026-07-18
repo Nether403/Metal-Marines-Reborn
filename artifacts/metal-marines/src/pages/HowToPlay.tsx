@@ -51,6 +51,8 @@ export default function HowToPlay() {
                   fields garrison APCs against landed Marines, and launches gunship strafes.
                   Use Factory doctrine (Auto / APC / Gunship / Hold) once a Factory is online.
                   Set gunship strike priority (Auto / HQ / AA / Energy / Missile) like Marine fire modes.
+                  <b className="text-lime-300"> AA Batteries</b> auto-engage hostile gunships — thicken
+                  your AA screen when radar shows craft over base.
                 </li>
               </ul>
             </CardContent>
