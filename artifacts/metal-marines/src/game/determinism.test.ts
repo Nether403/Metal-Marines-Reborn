@@ -15,6 +15,13 @@ import {
 } from "./replay";
 import { createMissionRuntime } from "./runtimeFactory";
 import { hashSeed, randomFloatFromSeed } from "./rng";
+import {
+  clampSkirmishDifficulty,
+  createProceduralMission,
+  formatSkirmishMissionId,
+  parseSkirmishMissionId,
+  sanitizeSkirmishSeed,
+} from "./procedural";
 import type { MissionDef, RuntimeState, Tile } from "./types";
 
 const makeTiles = (): Tile[] => {
@@ -473,6 +480,32 @@ assert.ok(
     }),
     "f1 INTERCEPT p7 ← 2,3"
   );
+}
+
+{
+  assert.equal(clampSkirmishDifficulty(0), 1);
+  assert.equal(clampSkirmishDifficulty(9), 5);
+  assert.equal(sanitizeSkirmishSeed("Alpha Seed!!"), "alphaseed");
+  assert.equal(formatSkirmishMissionId("reef", 3), "skirmish-d3-reef");
+  assert.deepEqual(parseSkirmishMissionId("skirmish-d2-coral"), {
+    difficulty: 2,
+    seed: "coral",
+  });
+  assert.deepEqual(parseSkirmishMissionId("skirmish-legacy"), {
+    difficulty: 5,
+    seed: "legacy",
+  });
+  const easy = createProceduralMission({ seed: "reef", difficulty: 1 });
+  const hard = createProceduralMission({ seed: "reef", difficulty: 5 });
+  assert.equal(easy.id, "skirmish-d1-reef");
+  assert.equal(hard.id, "skirmish-d5-reef");
+  assert.equal(easy.difficulty, 1);
+  assert.equal(hard.difficulty, 5);
+  assert.ok(hard.enemyAggression > easy.enemyAggression);
+  assert.ok(hard.startFunds > easy.startFunds);
+  // Same seed → same map layout regardless of difficulty (aggression/funds scale only).
+  assert.deepEqual(easy.playerStartHQ, hard.playerStartHQ);
+  assert.deepEqual(easy.enemyStartHQ, hard.enemyStartHQ);
 }
 
 console.log("game determinism checks passed");

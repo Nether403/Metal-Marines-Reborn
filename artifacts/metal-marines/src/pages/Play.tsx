@@ -78,6 +78,14 @@ const HOTKEYS_FACTORY: Record<string, "AUTO" | "APC" | "GUNSHIP" | "HOLD"> = {
   s: "GUNSHIP",
   h: "HOLD",
 };
+/** Gunship strike priority — free letters (no collision with build / weapon / factory). */
+const HOTKEYS_GUNSHIP: Record<string, "AUTO" | "HQ" | "AA" | "ENERGY" | "MISSILE"> = {
+  u: "AUTO",
+  j: "HQ",
+  k: "AA",
+  l: "ENERGY",
+  ";": "MISSILE",
+};
 
 export default function Play() {
   const [, params] = useRoute("/play/:missionId");
@@ -99,6 +107,7 @@ export default function Play() {
   const selectMechTier = useGame((s) => s.selectMechTier);
   const selectMechWeapon = useGame((s) => s.selectMechWeapon);
   const setFactoryDoctrine = useGame((s) => s.setFactoryDoctrine);
+  const setGunshipPriority = useGame((s) => s.setGunshipPriority);
   const setViewLayer = useGame((s) => s.setViewLayer);
   const clearSnapshot = useGame((s) => s.clearSnapshot);
 
@@ -283,6 +292,10 @@ export default function Play() {
         setFactoryDoctrine(HOTKEYS_FACTORY[k]);
         return;
       }
+      if (HOTKEYS_GUNSHIP[k]) {
+        setGunshipPriority(HOTKEYS_GUNSHIP[k]);
+        return;
+      }
       const buildType = HOTKEYS_BUILD[e.key] ?? HOTKEYS_BUILD[k];
       if (buildType) {
         selectBuild(buildType as keyof typeof BUILDINGS);
@@ -298,6 +311,7 @@ export default function Play() {
     selectMechTier,
     selectMechWeapon,
     setFactoryDoctrine,
+    setGunshipPriority,
     setPaused,
     setViewLayer,
   ]);

@@ -1,6 +1,6 @@
 import type { MissionDef, Tile, TerrainType } from "@/game/types";
 import { GRID_W, GRID_H } from "@/game/constants";
-import { createProceduralMission } from "@/game/procedural";
+import { createProceduralMission, parseSkirmishMissionId } from "@/game/procedural";
 
 const T = (s: string): Tile[] => {
   const tiles: Tile[] = [];
@@ -760,9 +760,17 @@ for (const ext of CAMPAIGN_EXTENSION) {
 export const getMission = (id: string) => {
   const fixed = MISSIONS.find((m) => m.id === id);
   if (fixed) return fixed;
-  if (id.startsWith("skirmish-")) {
-    const seed = id.slice("skirmish-".length) || "reborn";
-    return createProceduralMission({ seed, difficulty: 5, title: "Generated Skirmish" });
+  const skirmish = parseSkirmishMissionId(id);
+  if (skirmish) {
+    const mission = createProceduralMission({
+      seed: skirmish.seed,
+      difficulty: skirmish.difficulty,
+      title: "Generated Skirmish",
+    });
+    // Preserve the exact route id (legacy `skirmish-{seed}` vs canonical `skirmish-dN-…`)
+    // so Play's missionId effect does not remount mid-session.
+    if (mission.id !== id) return { ...mission, id };
+    return mission;
   }
   return undefined;
 };
