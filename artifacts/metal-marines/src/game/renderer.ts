@@ -393,10 +393,10 @@ const factionVisuals: Record<Owner, { primary: string; secondary: string; trim: 
     glass: "#bae6fd",
   },
   ENEMY: {
-    primary: "#d97706",
-    secondary: "#7c3aed",
-    trim: "#451a03",
-    glow: "rgba(216,180,254,0.48)",
+    primary: "#f59e0b",
+    secondary: "#c084fc",
+    trim: "#3b0764",
+    glow: "rgba(216,180,254,0.62)",
     glass: "#fde68a",
   },
 };
@@ -819,9 +819,19 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
   // Classic Metal Marines pads under structures — sells "built base" density.
   drawEntityShadow(ctx, cx, cy, b.type === "HQ" || b.type === "ICBM_SILO" ? 22 : 16, 8);
   ctx.save();
-  ctx.strokeStyle = b.side === "PLAYER" ? "rgba(248,113,113,0.35)" : "rgba(216,180,254,0.3)";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
+  if (b.side === "PLAYER") {
+    ctx.strokeStyle = "rgba(248,113,113,0.35)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
+  } else {
+    // Gold outer + purple inner so fog-revealed enemy bases read faction at combat zoom.
+    ctx.strokeStyle = "rgba(245,158,11,0.62)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
+    ctx.strokeStyle = "rgba(192,132,252,0.45)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cx - TILE_PX * 0.36, cy - TILE_PX * 0.14, TILE_PX * 0.72, TILE_PX * 0.42);
+  }
   ctx.restore();
 
   // HQ reads largest (classic MM command presence); other structures slightly overscale.
@@ -829,7 +839,18 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
     (TILE_PX / 64) *
     (b.type === "HQ" || b.type === "ICBM_SILO" ? 1.75 : b.type === "METAL_MARINE_BASE" ? 1.6 : 1.52);
   if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale })) {
-    // Sprite rendered successfully; overlays below still show EMP/progress/HP.
+    // Reinforce enemy gold/purple identity when CSS stage scales sprites down.
+    if (b.side === "ENEMY") {
+      ctx.save();
+      ctx.fillStyle = "rgba(245,158,11,0.85)";
+      ctx.fillRect(cx - 10, cy + 10, 4, 2);
+      ctx.fillRect(cx + 6, cy + 10, 4, 2);
+      ctx.fillStyle = "rgba(216,180,254,0.75)";
+      ctx.beginPath();
+      ctx.arc(cx + (b.type === "HQ" ? 0 : 6), cy - (b.type === "HQ" ? 18 : 12), 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   } else {
     drawProceduralBuilding(ctx, b, cx, cy, now);
   }

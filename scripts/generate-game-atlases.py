@@ -91,18 +91,19 @@ PLAYER = {
     "hazard_b": (20, 20, 20, 255),
 }
 ENEMY = {
-    "olive": (42, 36, 40, 255),
-    "olive_lit": (70, 55, 48, 255),
-    "metal": (48, 40, 52, 255),
-    "metal_lit": (90, 70, 55, 255),
-    "primary": (168, 85, 247, 255),
-    "secondary": (217, 140, 60, 255),
-    "trim": (18, 12, 22, 255),
-    "dark": (16, 10, 18, 255),
-    "glow": (192, 132, 252, 210),
-    "glass": (120, 60, 160, 220),
-    "hazard_a": (217, 140, 60, 255),
-    "hazard_b": (40, 20, 50, 255),
+    # Charcoal hull + brighter gold/purple so procedural fallbacks match hero recolor.
+    "olive": (38, 30, 44, 255),
+    "olive_lit": (78, 58, 52, 255),
+    "metal": (44, 34, 54, 255),
+    "metal_lit": (110, 78, 52, 255),
+    "primary": (192, 96, 255, 255),
+    "secondary": (240, 176, 64, 255),
+    "trim": (14, 8, 18, 255),
+    "dark": (14, 8, 16, 255),
+    "glow": (210, 140, 255, 230),
+    "glass": (140, 70, 190, 220),
+    "hazard_a": (240, 176, 64, 255),
+    "hazard_b": (36, 16, 48, 255),
 }
 
 
@@ -186,7 +187,11 @@ def fit_rgba(src: Image.Image, tw: int, th: int, pad: int = 1) -> Image.Image:
 
 
 def to_enemy_faction(im: Image.Image) -> Image.Image:
-    """Recolor olive/red player art toward charcoal / bronze / purple enemy identity."""
+    """Recolor olive/red player art toward charcoal / bronze / purple enemy identity.
+
+    Muddy purple-grey does not read at 64px combat zoom. Hull stays charcoal with a
+    clear purple cast; lit metal goes bronze/gold; red/cyan accents become vivid purple.
+    """
     im = im.convert("RGBA")
     px = im.load()
     w, h = im.size
@@ -195,15 +200,186 @@ def to_enemy_faction(im: Image.Image) -> Image.Image:
             r, g, b, a = px[x, y]
             if a < 8:
                 continue
-            # crush greens, push purple/bronze
-            nr = min(255, int(r * 0.55 + b * 0.15 + 35))
-            ng = min(255, int(g * 0.35 + r * 0.1 + 18))
-            nb = min(255, int(b * 0.45 + r * 0.25 + 55))
-            # keep bright red accents as gold/purple highlights
-            if r > 140 and r > g + 40 and r > b + 40:
-                nr, ng, nb = 196, 120, 255
-            px[x, y] = (nr, ng, nb, a)
+            lum = (r * 3 + g * 6 + b) // 10
+            sat = max(r, g, b) - min(r, g, b)
+            is_red = r > 135 and r > g + 35 and r > b + 35
+            is_green = g > r + 10 and g > b + 6
+            is_cyanish = b > r + 12 and b > g + 4 and lum > 70
+            is_lit = lum > 128
+            is_hi = lum > 175
+            is_warm = r > g + 5 and r > b + 3 and lum > 60 and not is_red
+
+            if is_red:
+                nr, ng, nb = 198, 96, 255
+            elif is_cyanish:
+                nr, ng, nb = 168, 88, 235
+            elif is_hi or (is_warm and is_lit):
+                # Bright / warm metal -> gold / bronze (must survive combat zoom)
+                t = min(1.0, (lum - 100) / 140.0)
+                nr = int(175 + t * 65)
+                ng = int(120 + t * 70)
+                nb = int(42 + t * 40)
+            elif is_green:
+                t = lum / 255.0
+                if is_lit:
+                    nr, ng, nb = 158, 108, 48
+                else:
+                    nr = int(30 + t * 55)
+                    ng = int(22 + t * 38)
+                    nb = int(42 + t * 70)
+            elif is_lit:
+                t = (lum - 128) / 127.0
+                nr = int(95 + t * 70)
+                ng = int(55 + t * 45)
+                nb = int(145 + t * 80)
+            else:
+                t = lum / 128.0 if lum < 128 else 1.0
+                # Dark hull: charcoal with a combat-readable purple cast (not muddy grey)
+                nr = int(28 + t * 70)
+                ng = int(16 + t * 45)
+                nb = int(48 + t * 115)
+                if sat > 12 and lum > 40:
+                    nr = min(255, nr + 18)
+                    nb = min(255, nb + 35)
+            px[x, y] = (min(255, nr), min(255, ng), min(255, nb), a)
     return im
+
+
+def reinforce_enemy_hero(im: Image.Image) -> Image.Image:
+    """Lift gold/purple on dedicated enemy heroes (e.g. hq-enemy) without full recolor."""
+    im = im.convert("RGBA")
+    px = im.load()
+    w, h = im.size
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a < 8:
+                continue
+            lum = (r + g + b) // 3
+            if b > r and b > g and lum > 50:
+                px[x, y] = (
+                    min(255, int(r * 0.85 + 40)),
+                    min(255, int(g * 0.8 + 20)),
+                    min(255, int(b * 0.7 + 90)),
+                    a,
+                )
+            elif lum > 150 and r > g:
+                px[x, y] = (
+                    min(255, int(r * 0.5 + 200 * 0.5)),
+                    min(255, int(g * 0.5 + 150 * 0.5)),
+                    min(255, int(b * 0.4 + 50 * 0.6)),
+                    a,
+                )
+    return im
+
+
+def stamp_enemy_faction_accents(cell: Image.Image) -> Image.Image:
+    """Gold pad trim + purple crown punch so enemy buildings read at combat scale."""
+    out = cell.copy()
+    bbox = _opaque_bbox(out)
+    if bbox is None:
+        return out
+    x0, y0, x1, y1 = bbox
+    bw, bh = max(1, x1 - x0), max(1, y1 - y0)
+
+    # Lift muddy midtone hulls toward readable purple (dark metal otherwise stays grey).
+    px = out.load()
+    w, h = out.size
+    for y in range(max(0, y0), min(h, y1)):
+        for x in range(max(0, x0), min(w, x1)):
+            r, g, b, a = px[x, y]
+            if a < 40:
+                continue
+            lum = (r + g + b) // 3
+            if 35 <= lum <= 120 and b <= r + 25:
+                px[x, y] = (
+                    min(255, int(r * 0.72 + 70 * 0.28)),
+                    min(255, int(g * 0.65 + 35 * 0.35)),
+                    min(255, int(b * 0.45 + 150 * 0.55)),
+                    a,
+                )
+
+    d = ImageDraw.Draw(out)
+    hazard_strip(
+        d,
+        x0 + 1,
+        min(out.height - 3, y1 - 1),
+        x1 - 1,
+        min(out.height - 1, y1 + 2),
+        ENEMY,
+        3,
+    )
+    for rx, ry in ((x0 + 1, y1 - 4), (x1 - 4, y1 - 4)):
+        d.rectangle([rx, ry, rx + 2, ry + 2], fill=(240, 180, 70, 240))
+
+    px = out.load()
+    candidates: list[tuple[int, int, int]] = []
+    for y in range(max(0, y0), min(h, y0 + max(4, bh // 2))):
+        for x in range(max(0, x0), min(w, x1)):
+            r, g, b, a = px[x, y]
+            if a < 60:
+                continue
+            lum = (r + g + b) // 3
+            if lum > 110:
+                candidates.append((lum, x, y))
+    candidates.sort(reverse=True)
+    for lum, x, y in candidates[: max(8, bw * bh // 40)]:
+        r, g, b, a = px[x, y]
+        px[x, y] = (
+            min(255, int(r * 0.35 + 200 * 0.65)),
+            min(255, int(g * 0.35 + 100 * 0.65)),
+            min(255, int(b * 0.25 + 255 * 0.75)),
+            a,
+        )
+
+    if candidates:
+        _, bx, by = candidates[0]
+        rr = max(3, min(7, bw // 7))
+        glow = Image.new("RGBA", out.size, (0, 0, 0, 0))
+        gd = ImageDraw.Draw(glow)
+        gd.ellipse([bx - rr - 2, by - rr - 2, bx + rr + 2, by + rr + 2], fill=(140, 70, 220, 70))
+        gd.ellipse([bx - rr, by - rr, bx + rr, by + rr], fill=(200, 130, 255, 110))
+        out = Image.alpha_composite(out, glow)
+        d = ImageDraw.Draw(out)
+        hazard_strip(
+            d,
+            x0 + 1,
+            min(out.height - 3, y1 - 1),
+            x1 - 1,
+            min(out.height - 1, y1 + 2),
+            ENEMY,
+            3,
+        )
+
+    px = out.load()
+    for y in range(max(0, y0), min(h, y1)):
+        for x in range(max(0, x0), min(w, x1)):
+            r, g, b, a = px[x, y]
+            if a < 40:
+                continue
+            edge = False
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = x + dx, y + dy
+                if nx < 0 or ny < 0 or nx >= w or ny >= h or px[nx, ny][3] < 40:
+                    edge = True
+                    break
+            if not edge:
+                continue
+            if y < y0 + bh * 0.40:
+                px[x, y] = (
+                    min(255, (r + 180) // 2),
+                    min(255, (g + 90) // 2),
+                    min(255, (b + 240) // 2),
+                    a,
+                )
+            elif y > y0 + bh * 0.70:
+                px[x, y] = (
+                    min(255, (r + 220) // 2),
+                    min(255, (g + 150) // 2),
+                    min(255, (b + 55) // 2),
+                    a,
+                )
+    return out
 
 
 def load_hero(name: str) -> Image.Image | None:
@@ -869,25 +1045,34 @@ def make_buildings(
     faction: str,
     heroes: dict[str, Image.Image],
     export_icons: bool = False,
+    *,
+    native_enemy_labels: set[str] | None = None,
 ):
     row_heights = [h for _, h in BUILDING_ROWS]
     width = 64 * 4
     height = sum(row_heights)
     img = new_rgba(width, height)
     idle_by_label: dict[str, Image.Image] = {}
+    native = native_enemy_labels or set()
     y = 0
     for (label, h), rh in zip(BUILDING_ROWS, row_heights):
         hero = heroes.get(label)
+        # Fit (+ enemy recolor/accents) once so all states share combat-scale identity.
+        # Recolor AFTER fit — LANCZOS on a full-res recolor muddies gold/purple.
+        base = None
+        if hero is not None:
+            base = fit_rgba(hero, 64, h, pad=1)
+            if faction == "enemy":
+                if label not in native:
+                    base = to_enemy_faction(base)
+                base = stamp_enemy_faction_accents(base)
         for si, state in enumerate(STATES):
-            if hero is not None:
-                cell = hero_state_frame(
-                    fit_rgba(hero, 64, h, pad=1),
-                    state,
-                    label,
-                    palette,
-                )
+            if base is not None:
+                cell = hero_state_frame(base, state, label, palette)
             else:
                 cell = building_block(palette, label, state, 64, h, faction=faction)
+                if faction == "enemy" and state == "idle":
+                    cell = stamp_enemy_faction_accents(cell)
             if state == "idle":
                 idle_by_label[label] = cell.copy()
             img.paste(cell, (si * 64, y), cell)
@@ -1447,14 +1632,17 @@ def main():
         hero = load_hero(stem)
         if hero is not None:
             player_heroes[label] = hero
-    # dedicated enemy HQ if present; else recolor
+    # dedicated enemy HQ if present; else recolor at atlas fit (64px) for combat chroma.
     enemy_heroes: dict[str, Image.Image] = {}
+    native_enemy_labels: set[str] = set()
     hq_e = load_hero("hq-enemy")
     for label, hero in player_heroes.items():
         if label == "HQ" and hq_e is not None:
-            enemy_heroes[label] = hq_e
+            enemy_heroes[label] = reinforce_enemy_hero(hq_e)
+            native_enemy_labels.add(label)
         else:
-            enemy_heroes[label] = to_enemy_faction(hero)
+            # Keep player hero; to_enemy_faction runs after fit_rgba in make_buildings.
+            enemy_heroes[label] = hero
 
     mech_p = load_hero("mech-player")
     mech_e = load_hero("mech-enemy") or (to_enemy_faction(mech_p) if mech_p else None)
@@ -1466,7 +1654,14 @@ def main():
 
     make_terrain(pavement)
     make_buildings(OUT / "buildings-player.png", PLAYER, "player", player_heroes, export_icons=True)
-    make_buildings(OUT / "buildings-enemy.png", ENEMY, "enemy", enemy_heroes, export_icons=False)
+    make_buildings(
+        OUT / "buildings-enemy.png",
+        ENEMY,
+        "enemy",
+        enemy_heroes,
+        export_icons=False,
+        native_enemy_labels=native_enemy_labels,
+    )
     make_units(mech_p, mech_e)
     make_projectiles()
     make_fx()
