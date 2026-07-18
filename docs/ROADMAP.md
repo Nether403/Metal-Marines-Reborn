@@ -49,8 +49,11 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 
 ### Phase 5 — Presentation layer (in progress)
 - [x] Campaign Theater meta-map (`/campaign`) with sector nodes + intel panel
-- [x] Art upgrade pass: identity-board palettes, isometric building blocks, HF hero HQ/mech overlays hot-swapped into atlases
-- [ ] Replace remaining procedural building cells with commissioned / AI hero sprites (Energy, Radar, Gun Pod, Factory next)
+- [x] Art upgrade pass: identity-board palettes, isometric building blocks, HF/Cursor hero overlays
+- [x] Core hero set: HQ, Energy, Radar, Missile/ICBM, Turret, Gun Pod, AA, Factory, Supply, Mech + enemy recolors
+- [x] Platform-pad terrain, building shadows/pads, larger mechs with M.MARINE callouts, build-palette icons
+- [ ] Remaining systems buildings (Jammer, Tunnel, Ecology) as hero sprites
+- [ ] Battlefeel polish: sample SFX, denser FX, shoreline foam animation
 - [ ] True isometric camera (optional)
 - [ ] Vehicles / aircraft
 - [ ] Multiplayer / replay foundation

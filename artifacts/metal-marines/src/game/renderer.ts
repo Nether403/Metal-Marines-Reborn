@@ -401,8 +401,13 @@ const drawIsland = (
       }
       drawTerrainTransitions(ctx, tiles, x, y, px, py, tile.terrain);
 
-      // Tile outline
-      ctx.strokeStyle = tile.terrain === "WATER" ? "rgba(125,211,252,0.08)" : "rgba(34,197,94,0.055)";
+      // Soft pad seams (pavement tiles) — keep quieter than old neon grid
+      ctx.strokeStyle =
+        tile.terrain === "WATER"
+          ? "rgba(125,211,252,0.1)"
+          : tile.terrain === "GRASS"
+            ? "rgba(15,23,42,0.22)"
+            : "rgba(34,197,94,0.08)";
       ctx.lineWidth = 1;
       ctx.strokeRect(px + 0.5, py + 0.5, TILE_PX - 1, TILE_PX - 1);
 
@@ -727,12 +732,29 @@ const drawProceduralBuilding = (ctx: CanvasRenderingContext2D, b: Building, cx: 
   ctx.restore();
 };
 
+const drawEntityShadow = (ctx: CanvasRenderingContext2D, cx: number, cy: number, rx: number, ry: number) => {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 10, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+};
+
 const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolean, now: number) => {
   if (hidden) return;
   const { x: cx, y: cy } = tileToWorld(b.side, b.pos.x, b.pos.y);
   const spriteKey = buildingSpriteKey(b, now);
-  // Slight overscale so 64px atlas art reads clearly on the battlefield.
-  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: (TILE_PX / 64) * 1.28 })) {
+  // Classic Metal Marines pads under structures — sells "built base" density.
+  drawEntityShadow(ctx, cx, cy, b.type === "HQ" || b.type === "ICBM_SILO" ? 22 : 16, 8);
+  ctx.save();
+  ctx.strokeStyle = b.side === "PLAYER" ? "rgba(248,113,113,0.35)" : "rgba(216,180,254,0.3)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
+  ctx.restore();
+
+  // Overscale so hero atlas art reads like SNES remake silhouettes.
+  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale: (TILE_PX / 64) * 1.45 })) {
     // Sprite rendered successfully; overlays below still show EMP/progress/HP.
   } else {
     drawProceduralBuilding(ctx, b, cx, cy, now);
@@ -1004,16 +1026,32 @@ const drawProceduralMech = (ctx: CanvasRenderingContext2D, m: Mech) => {
 const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
   const spriteKey = mechSpriteKey(m, time);
   const underground = (m.layer ?? "SURFACE") === "UNDERGROUND";
-  if (
+  drawEntityShadow(ctx, m.pos.x, m.pos.y, 14, 6);
+  const drew =
     spriteKey &&
     spriteManager.draw(ctx, spriteKey, m.pos.x, m.pos.y, {
-      scale: (TILE_PX / 64) * 1.35,
+      scale: (TILE_PX / 64) * 1.7,
       alpha: underground ? 0.62 : 1,
-    })
-  ) {
-    return;
+    });
+  if (!drew) drawProceduralMech(ctx, m);
+
+  // Original-game style unit callout
+  ctx.save();
+  ctx.font = "bold 8px 'Space Mono', ui-monospace, monospace";
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(m.pos.x - 22, m.pos.y - 36, 44, 11);
+  ctx.fillStyle = m.side === "PLAYER" ? "#fecaca" : "#fde68a";
+  ctx.fillText("M.MARINE", m.pos.x, m.pos.y - 27);
+  ctx.textAlign = "start";
+  ctx.restore();
+
+  if (m.hp < m.maxHp) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(m.pos.x - 13, m.pos.y + 18, 26, 3);
+    ctx.fillStyle = m.hp / m.maxHp > 0.35 ? "#22c55e" : "#ef4444";
+    ctx.fillRect(m.pos.x - 13, m.pos.y + 18, 26 * (m.hp / m.maxHp), 3);
   }
-  drawProceduralMech(ctx, m);
 };
 
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
