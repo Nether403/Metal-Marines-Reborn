@@ -221,7 +221,7 @@ export const BUILDINGS: Record<BuildingType, BuildingSpec> = {
     buildTime: 8,
     maxHp: 320,
     description:
-      "Speeds construction, fields garrison APCs, and launches gunship strafes. Set Factory doctrine in Strike Control.",
+      "Speeds construction, fields garrison APCs, and launches gunship strafes. Set doctrine and strike priority in Strike Control.",
   },
   DUMMY_BASE: {
     type: "DUMMY_BASE",

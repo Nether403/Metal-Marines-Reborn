@@ -152,6 +152,9 @@ export interface TerrainMutation {
 /** Player Factory production preference (enemy always uses AUTO). */
 export type FactoryDoctrine = "AUTO" | "APC" | "GUNSHIP" | "HOLD";
 
+/** Player gunship strike priority (enemy always uses AUTO). Mirrors mech fire-mode chips. */
+export type GunshipStrikePriority = "AUTO" | "HQ" | "AA" | "ENERGY" | "MISSILE";
+
 export type ReplayCommandType =
   | "BUILD"
   | "FIRE"
@@ -159,7 +162,8 @@ export type ReplayCommandType =
   | "SELECT_BUILD"
   | "SELECT_WEAPON"
   | "SET_VIEW_LAYER"
-  | "SET_FACTORY_DOCTRINE";
+  | "SET_FACTORY_DOCTRINE"
+  | "SET_GUNSHIP_PRIORITY";
 
 export interface ReplayCommand {
   frame: number;
@@ -285,6 +289,8 @@ export interface RuntimeState {
   selectedMechTier: MechTier;
   /** Player-only Factory spawn preference; enemy Factories stay on AUTO. */
   playerFactoryDoctrine: FactoryDoctrine;
+  /** Player-only gunship building priority; enemy gunships stay on AUTO. */
+  playerGunshipPriority: GunshipStrikePriority;
   viewLayer: TileLayer;
   weatherActive?: {
     type: WeatherType;

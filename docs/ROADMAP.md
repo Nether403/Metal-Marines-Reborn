@@ -61,6 +61,8 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - See `AGENTS.md` backlog for Automation-driven next picks.
 - [x] Vehicles / aircraft sprites (gameplay stubbed; atlas hot-swappable)
 - [x] Factory garrison APCs + assault gunships (spawn/combat wired)
+- [x] Factory doctrine + gunship strike priority (fire-mode style)
+- [x] Late campaign: authored m13–m15 maps + hard cadence (diff ≥5 for m13–m20)
 - [ ] True isometric camera (optional)
 - [ ] Multiplayer / replay foundation
 
