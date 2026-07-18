@@ -43,6 +43,7 @@ const makeState = (): RuntimeState => ({
   selectedMechWeapon: "NORMAL",
   selectedMechTier: "GUNNER_I",
   playerFactoryDoctrine: "AUTO",
+  playerGunshipPriority: "AUTO",
   viewLayer: "SURFACE",
   terrainMutations: [],
   aiState: {
@@ -227,6 +228,51 @@ assert.ok(
   for (let t = 0; t < 45; t += 0.25) stepGame(apcOnly, mission, 0.25);
   assert.ok(apcOnly.vehicles.some((v) => v.owner === "PLAYER" && v.hp > 0), "APC doctrine should spawn garrison APCs");
   assert.equal(apcOnly.aircraft.length, 0, "APC doctrine must not launch gunships");
+}
+
+// --- Gunship strike priority (ENERGY) ---
+{
+  const mission = idleMission("gunship-priority", 1, 0.1, 0.8);
+  const state = createMissionRuntime(mission);
+  state.buildings.push({
+    id: "factory_gs",
+    type: "FACTORY",
+    side: "PLAYER",
+    owner: "PLAYER",
+    pos: { x: 6, y: 5 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.FACTORY.maxHp,
+    maxHp: BUILDINGS.FACTORY.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  state.buildings.push({
+    id: "enemy_energy",
+    type: "ENERGY_PLANT",
+    side: "ENEMY",
+    owner: "ENEMY",
+    pos: { x: 2, y: 2 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.ENERGY_PLANT.maxHp,
+    maxHp: BUILDINGS.ENERGY_PLANT.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  state.playerFunds = 3000;
+  state.playerEnergy = 1200;
+  state.playerFactoryDoctrine = "GUNSHIP";
+  state.playerGunshipPriority = "ENERGY";
+  for (let t = 0; t < 50; t += 0.25) stepGame(state, mission, 0.25);
+  const gunship = state.aircraft.find((a) => a.owner === "PLAYER" && a.hp > 0);
+  assert.ok(gunship, "GUNSHIP doctrine should launch a player gunship");
+  const locked = state.buildings.find((b) => b.id === gunship!.targetBuildingId);
+  assert.ok(locked, "gunship should lock a building target");
+  assert.equal(locked!.type, "ENERGY_PLANT", "ENERGY priority should lock onto an Energy Plant");
+  assert.equal(locked!.side, "ENEMY", "gunship should target the enemy island");
 }
 
 console.log("game determinism checks passed");

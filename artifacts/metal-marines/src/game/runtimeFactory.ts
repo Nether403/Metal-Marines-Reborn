@@ -95,6 +95,7 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
     selectedMechWeapon: "NORMAL",
     selectedMechTier: "GUNNER_I",
     playerFactoryDoctrine: "AUTO",
+    playerGunshipPriority: "AUTO",
     viewLayer: "SURFACE",
     terrainMutations: [],
     aiState: {

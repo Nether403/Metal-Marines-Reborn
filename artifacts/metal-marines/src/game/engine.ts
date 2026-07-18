@@ -66,6 +66,7 @@ import type {
   Aircraft,
   Building,
   BuildingType,
+  GunshipStrikePriority,
   Mech,
   MechWeaponMode,
   MissionDef,
@@ -1165,6 +1166,43 @@ const countLiveVehicles = (state: RuntimeState, owner: Owner) =>
 const countLiveAircraft = (state: RuntimeState, owner: Owner) =>
   state.aircraft.filter((a) => a.owner === owner && a.state !== "DEAD").length;
 
+const gunshipPriorityMatches = (b: Building, priority: GunshipStrikePriority): boolean => {
+  if (priority === "HQ") return b.type === "HQ";
+  if (priority === "AA") return b.type === "AA_GUN";
+  if (priority === "ENERGY") return b.type === "ENERGY_PLANT";
+  if (priority === "MISSILE") return b.type === "MISSILE_LAUNCHER" || b.type === "ICBM_SILO";
+  return false;
+};
+
+/** Pick a gunship strike target. AUTO prefers HQ then AA; named priorities heavily weight matches. */
+const pickGunshipTarget = (
+  state: RuntimeState,
+  from: Position,
+  enemySide: Owner,
+  priority: GunshipStrikePriority
+): Building | undefined => {
+  let best: Building | undefined;
+  let bestScore = Infinity;
+  for (const b of state.buildings) {
+    if (b.side !== enemySide || b.hp <= 0 || b.type === "LAND_MINE") continue;
+    const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
+    const d = distance(bw.x, bw.y, from.x, from.y);
+    let score = d;
+    if (priority === "AUTO") {
+      score += b.type === "HQ" ? -40 : b.type === "AA_GUN" ? -20 : 0;
+    } else if (gunshipPriorityMatches(b, priority)) {
+      score -= 220;
+    } else if (b.type === "HQ") {
+      score -= 12;
+    }
+    if (score < bestScore) {
+      bestScore = score;
+      best = b;
+    }
+  }
+  return best;
+};
+
 const spawnVehicleAtFactory = (state: RuntimeState, factory: Building) => {
   const wp = tileToWorld(factory.side, factory.pos.x, factory.pos.y);
   state.vehicles.push({
@@ -1184,10 +1222,11 @@ const spawnVehicleAtFactory = (state: RuntimeState, factory: Building) => {
 const spawnAircraftFromFactory = (state: RuntimeState, factory: Building) => {
   const home = tileToWorld(factory.side, factory.pos.x, factory.pos.y);
   const enemySide: Owner = factory.side === "PLAYER" ? "ENEMY" : "PLAYER";
-  const targets = state.buildings.filter((b) => b.side === enemySide && b.hp > 0);
-  const hq = targets.find((b) => b.type === "HQ") ?? targets[0];
-  const aim = hq
-    ? tileToWorld(hq.side, hq.pos.x, hq.pos.y)
+  const priority: GunshipStrikePriority =
+    factory.side === "PLAYER" ? state.playerGunshipPriority : "AUTO";
+  const target = pickGunshipTarget(state, home, enemySide, priority);
+  const aim = target
+    ? tileToWorld(target.side, target.pos.x, target.pos.y)
     : {
         x: islandOriginX(enemySide) + ISLAND_PX_W / 2,
         y: ISLAND_PX_H / 2,
@@ -1202,7 +1241,7 @@ const spawnAircraftFromFactory = (state: RuntimeState, factory: Building) => {
     state: "FLYING",
     facing: Math.atan2(aim.y - home.y, aim.x - home.x),
     attackCooldown: 0.4,
-    targetBuildingId: hq?.id,
+    targetBuildingId: target?.id,
   });
   sfx("launch");
 };
@@ -1385,20 +1424,17 @@ const tickAircraft = (state: RuntimeState, dt: number) => {
     }
 
     const enemySide: Owner = a.owner === "PLAYER" ? "ENEMY" : "PLAYER";
+    const priority: GunshipStrikePriority =
+      a.owner === "PLAYER" ? state.playerGunshipPriority : "AUTO";
     let target = a.targetBuildingId
       ? state.buildings.find((b) => b.id === a.targetBuildingId && b.hp > 0)
       : undefined;
-    if (!target) {
-      let best = Infinity;
-      for (const b of state.buildings) {
-        if (b.side !== enemySide || b.hp <= 0 || b.type === "LAND_MINE") continue;
-        const bw = tileToWorld(b.side, b.pos.x, b.pos.y);
-        const d = distance(bw.x, bw.y, a.pos.x, a.pos.y);
-        const weighted = d + (b.type === "HQ" ? -40 : b.type === "AA_GUN" ? -20 : 0);
-        if (weighted < best) {
-          best = weighted;
-          target = b;
-        }
+    // Retarget when missing, or when a named priority no longer matches the locked building.
+    if (!target || (priority !== "AUTO" && !gunshipPriorityMatches(target, priority))) {
+      const preferred = pickGunshipTarget(state, a.pos, enemySide, priority);
+      // Keep current lock if no preferred-type building exists yet (fallback already in pick).
+      if (preferred && (!target || preferred.id !== target.id)) {
+        target = preferred;
       }
       a.targetBuildingId = target?.id;
     }

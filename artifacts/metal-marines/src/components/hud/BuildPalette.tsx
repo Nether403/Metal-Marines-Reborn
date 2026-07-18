@@ -1,6 +1,6 @@
 import { BUILDINGS, MAX_AIRCRAFT_PER_SIDE, MAX_VEHICLES_PER_SIDE, WEAPON_COSTS, WEAPON_LABELS } from "@/game/constants";
 import { formatCostPressure, getBuildingCost } from "@/game/economy";
-import type { BuildingType, FactoryDoctrine, ProjectileType, RuntimeState } from "@/game/types";
+import type { BuildingType, FactoryDoctrine, GunshipStrikePriority, ProjectileType, RuntimeState } from "@/game/types";
 import { useGame } from "@/game/store";
 import { cn } from "@/lib/utils";
 import { Crosshair, Hammer, LayoutGrid, Radio, Rocket, Shield, Skull, Zap } from "lucide-react";
@@ -95,6 +95,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
   const selectMechWeapon = useGame((s) => s.selectMechWeapon);
   const selectMechTier = useGame((s) => s.selectMechTier);
   const setFactoryDoctrine = useGame((s) => s.setFactoryDoctrine);
+  const setGunshipPriority = useGame((s) => s.setGunshipPriority);
   const [filter, setFilter] = useState<FilterTab>("BASE");
 
   // Hotkeys can select a building outside the active tab — follow the selection.
@@ -128,6 +129,14 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
     { id: "APC", label: "APC", title: "Prefer garrison APCs only (no gunships)" },
     { id: "GUNSHIP", label: "Gunship", title: "Prefer gunship assault; APCs only vs invaders" },
     { id: "HOLD", label: "Hold", title: "Halt Factory unit production" },
+  ];
+
+  const gunshipPriorities: { id: GunshipStrikePriority; label: string; title: string }[] = [
+    { id: "AUTO", label: "Auto", title: "Gunships prefer HQ, then AA, then nearest" },
+    { id: "HQ", label: "HQ", title: "Prioritize enemy Headquarters" },
+    { id: "AA", label: "AA", title: "Prioritize enemy AA Batteries" },
+    { id: "ENERGY", label: "Energy", title: "Prioritize enemy Energy Plants" },
+    { id: "MISSILE", label: "Missile", title: "Prioritize Missile / ICBM Silos" },
   ];
 
   const readyWeapons = weaponOrder.filter((t) => {
@@ -361,30 +370,57 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
             </div>
 
             {hasFactory && (
-              <div className="mt-1.5 flex flex-wrap items-center gap-1">
-                <span
-                  className="px-1 text-[8px] uppercase tracking-wider"
-                  style={{ color: "rgba(251,191,36,0.75)" }}
-                  title="Factory unit production"
-                >
-                  Factory {playerApcCount}/{MAX_VEHICLES_PER_SIDE} APC · {playerGunshipCount}/{MAX_AIRCRAFT_PER_SIDE} GS
-                </span>
-                {factoryDoctrines.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => setFactoryDoctrine(d.id)}
-                    className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
-                    style={{
-                      border: `1px solid ${state.playerFactoryDoctrine === d.id ? "rgba(251,191,36,0.85)" : "rgba(148,163,184,0.3)"}`,
-                      background: state.playerFactoryDoctrine === d.id ? "rgba(251,191,36,0.18)" : "rgba(15,23,42,0.6)",
-                      color: state.playerFactoryDoctrine === d.id ? "#fde68a" : "#94a3b8",
-                    }}
-                    title={d.title}
+              <div className="mt-1.5 space-y-1">
+                <div className="flex flex-wrap items-center gap-1">
+                  <span
+                    className="px-1 text-[8px] uppercase tracking-wider"
+                    style={{ color: "rgba(251,191,36,0.75)" }}
+                    title="Factory unit production"
                   >
-                    {d.label}
-                  </button>
-                ))}
+                    Factory {playerApcCount}/{MAX_VEHICLES_PER_SIDE} APC · {playerGunshipCount}/{MAX_AIRCRAFT_PER_SIDE} GS
+                  </span>
+                  {factoryDoctrines.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setFactoryDoctrine(d.id)}
+                      className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
+                      style={{
+                        border: `1px solid ${state.playerFactoryDoctrine === d.id ? "rgba(251,191,36,0.85)" : "rgba(148,163,184,0.3)"}`,
+                        background: state.playerFactoryDoctrine === d.id ? "rgba(251,191,36,0.18)" : "rgba(15,23,42,0.6)",
+                        color: state.playerFactoryDoctrine === d.id ? "#fde68a" : "#94a3b8",
+                      }}
+                      title={d.title}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  <span
+                    className="px-1 text-[8px] uppercase tracking-wider"
+                    style={{ color: "rgba(125,211,252,0.75)" }}
+                    title="Gunship strike priority"
+                  >
+                    Strike
+                  </span>
+                  {gunshipPriorities.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setGunshipPriority(p.id)}
+                      className="px-1.5 py-0.5 text-[8px] uppercase tracking-wider"
+                      style={{
+                        border: `1px solid ${state.playerGunshipPriority === p.id ? "rgba(56,189,248,0.85)" : "rgba(148,163,184,0.3)"}`,
+                        background: state.playerGunshipPriority === p.id ? "rgba(14,165,233,0.18)" : "rgba(15,23,42,0.6)",
+                        color: state.playerGunshipPriority === p.id ? "#7dd3fc" : "#94a3b8",
+                      }}
+                      title={p.title}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   BuildingType,
   FactoryDoctrine,
+  GunshipStrikePriority,
   MechTier,
   MechWeaponMode,
   MissionDef,
@@ -72,6 +73,7 @@ interface Store {
   selectMechWeapon: (mode: MechWeaponMode) => void;
   selectMechTier: (tier: MechTier) => void;
   setFactoryDoctrine: (doctrine: FactoryDoctrine) => void;
+  setGunshipPriority: (priority: GunshipStrikePriority) => void;
   setViewLayer: (layer: TileLayer) => void;
   tryBuild: (x: number, y: number) => boolean;
   tryFire: (wx: number, wy: number) => boolean;
@@ -187,6 +189,20 @@ export const useGame = create<Store>((set, get) => ({
     set({ runtime: { ...rt } });
   },
 
+  setGunshipPriority: (priority) => {
+    const rt = get().runtime;
+    if (!rt) return;
+    if (rt.playerGunshipPriority !== priority) {
+      recordReplayCommand(rt, { type: "SET_GUNSHIP_PRIORITY", payload: { priority } });
+    }
+    rt.playerGunshipPriority = priority;
+    // Clear locked targets so live gunships retarget under the new priority.
+    for (const a of rt.aircraft) {
+      if (a.owner === "PLAYER") a.targetBuildingId = undefined;
+    }
+    set({ runtime: { ...rt } });
+  },
+
   setViewLayer: (layer) => {
     const rt = get().runtime;
     if (!rt) return;
@@ -283,6 +299,7 @@ export const useGame = create<Store>((set, get) => ({
       parsed.runtime.rngSeed ??= hashSeed(`${m.id}:${m.index}:${m.difficulty}`);
       parsed.runtime.viewLayer ??= "SURFACE";
       parsed.runtime.playerFactoryDoctrine ??= "AUTO";
+      parsed.runtime.playerGunshipPriority ??= "AUTO";
       parsed.runtime.vehicles ??= [];
       parsed.runtime.aircraft ??= [];
       parsed.runtime.terrainMutations ??= [];

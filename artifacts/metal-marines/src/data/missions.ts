@@ -173,6 +173,82 @@ const M6_E = T(`
 ~~~~~~~~~~~~
 `);
 
+// Late-campaign authored maps (m13–m15) — choke islands for hard ops.
+const M13_P = T(`
+~~~~~~~~~~~~
+~^^~....~^^~
+~^..FFFF..^~
+~....~~....~
+~..F.HHH.F.~
+~....HHH...~
+~..F.~.~.F.~
+~.^......^.~
+~^^F....F^^~
+~~~~~~~~~~~~
+`);
+const M13_E = T(`
+~~~~~~~~~~~~
+~^^F....F^^~
+~.^......^.~
+~..F.~.~.F.~
+~....HHH...~
+~..F.HHH.F.~
+~....~~....~
+~^..FFFF..^~
+~^^~....~^^~
+~~~~~~~~~~~~
+`);
+
+const M14_P = T(`
+~~~~~~~~~~~~
+~^^^^..^^^^~
+~^........^~
+~..^^..^^..~
+~....HHH...~
+~..F.HHH.F.~
+~..........~
+~.FF....FF.~
+~^~......~^~
+~~~~~~~~~~~~
+`);
+const M14_E = T(`
+~~~~~~~~~~~~
+~^~......~^~
+~.FF....FF.~
+~..........~
+~..F.HHH.F.~
+~....HHH...~
+~..^^..^^..~
+~^........^~
+~^^^^..^^^^~
+~~~~~~~~~~~~
+`);
+
+const M15_P = T(`
+~~~~~~~~~~~~
+~F.F.~~.F.F~
+~.FFF..FFF.~
+~..F....F..~
+~.^..HHH..^~
+~....HHH...~
+~.^^....^^.~
+~F..FFFF..F~
+~.^~~~~~~^.~
+~~~~~~~~~~~~
+`);
+const M15_E = T(`
+~~~~~~~~~~~~
+~.^~~~~~~^.~
+~F..FFFF..F~
+~.^^....^^.~
+~....HHH...~
+~.^..HHH..^~
+~..F....F..~
+~.FFF..FFF.~
+~F.F.~~.F.F~
+~~~~~~~~~~~~
+`);
+
 // Strip the H markers; HQ position is set explicitly. Convert H back to grass.
 const cleanH = (tiles: Tile[]): Tile[] =>
   tiles.map((t) => (t.terrain as string) === "HHH" ? t : t);
@@ -401,6 +477,54 @@ const CAMPAIGN_EXTENSION: Array<{
     mapP: M6_P,
     mapE: M6_E,
   },
+  {
+    id: "m13",
+    index: 13,
+    title: "Operation: Strait Gate",
+    commanderId: "voss",
+    objective: "Force the strait — break AA, then the HQ.",
+    briefing:
+      "Narrow water cuts and forest belts choke drop lanes. Raise a Factory, set gunship strike priority to AA, then punch HQ once the lattice is down. Difficulty stays hard.",
+    difficulty: 5,
+    aggression: 0.8,
+    eco: 0.55,
+    funds: 1850,
+    energy: 820,
+    mapP: M13_P,
+    mapE: M13_E,
+  },
+  {
+    id: "m14",
+    index: 14,
+    title: "Operation: Ridge Hammer",
+    commanderId: "rhe",
+    objective: "Clear mountain ridges and destroy the HQ network.",
+    briefing:
+      "Ridge walls funnel Marines into Gun Pod kill zones. Use Anti-POD loadouts, Dummy Cover, and Energy-priority gunships to starve their grid before the final push.",
+    difficulty: 5,
+    aggression: 0.85,
+    eco: 0.6,
+    funds: 1900,
+    energy: 850,
+    mapP: M14_P,
+    mapE: M14_E,
+  },
+  {
+    id: "m15",
+    index: 15,
+    title: "Operation: Canopy Break",
+    commanderId: "iyobi",
+    objective: "Burn through canopy cover and end the HQ.",
+    briefing:
+      "Dense forest and tidal cuts hide Dummy Bases. Scout with radar, designate Missile priority for gunships, and authorize ICBM fire only when the 3×3 silo is intact.",
+    difficulty: 5,
+    aggression: 0.88,
+    eco: 0.58,
+    funds: 1950,
+    energy: 880,
+    mapP: M15_P,
+    mapE: M15_E,
+  },
 ];
 
 for (const ext of CAMPAIGN_EXTENSION) {
@@ -423,12 +547,13 @@ for (const ext of CAMPAIGN_EXTENSION) {
   });
 }
 
-// Missions 13–20: seeded procedural ops to approach original campaign length
-for (let i = 13; i <= 20; i++) {
+// Missions 16–20: seeded procedural ops — hard cadence (diff ≥5).
+for (let i = 16; i <= 20; i++) {
   const seed = `campaign-${i}`;
+  const difficulty = i <= 17 ? 5 : 6;
   const generated = createProceduralMission({
     seed,
-    difficulty: Math.min(6, 3 + Math.floor((i - 13) / 2)),
+    difficulty,
     title: `Operation: Frontier ${i}`,
   });
   MISSIONS.push({
@@ -437,7 +562,9 @@ for (let i = 13; i <= 20; i++) {
     index: i,
     commanderId: ["voss", "rhe", "iyobi", "calder", "stryx", "null_"][(i - 1) % 6],
     objective: generated.objective,
-    briefing: `${generated.briefing} Advanced campaign sector ${i}/20. Tunnel and ecology tech are authorized if you can afford the diversion.`,
+    briefing: `${generated.briefing} Advanced campaign sector ${i}/20 — hard cadence. Tunnel and ecology tech are authorized if you can afford the diversion.`,
+    difficulty,
+    enemyAggression: Math.min(1, 0.75 + (i - 16) * 0.05),
   });
 }
 
