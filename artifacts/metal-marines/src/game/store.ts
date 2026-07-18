@@ -160,6 +160,8 @@ const initRuntime = (mission: MissionDef): RuntimeState => {
     buildings,
     projectiles: [],
     mechs: [],
+    vehicles: [],
+    aircraft: [],
     particles: [],
     fogPlayer,
     fogEnemy,

@@ -10,6 +10,7 @@ import {
   WORLD_W,
 } from "./constants";
 import type {
+  Aircraft,
   Building,
   BuildingType,
   Mech,
@@ -18,6 +19,7 @@ import type {
   Projectile,
   RuntimeState,
   Tile,
+  Vehicle,
 } from "./types";
 import { islandOriginX, isBuildable, projectileCurrentPos, tileToWorld } from "./engine";
 import { spriteManager } from "./sprites";
@@ -382,6 +384,26 @@ const mechSpriteKey = (m: Mech, time: number): string | null => {
   if (stateKey === "attacking") return `unit.mech.${owner}.fighting`;
   if (stateKey === "landing") return `unit.mech.${owner}.boarding`;
   return `unit.mech.${owner}.${stateKey}`;
+};
+
+const vehicleSpriteKey = (v: Vehicle, time: number): string => {
+  const owner = v.owner === "PLAYER" ? "player" : "enemy";
+  if (v.state === "DEAD") return `unit.vehicle.${owner}.dead`;
+  if (v.state === "MOVING") {
+    return spriteManager.animationFrame(`unit.vehicle.${owner}.moving`, time * 1000)
+      ?? `unit.vehicle.${owner}.moving`;
+  }
+  return `unit.vehicle.${owner}.idle`;
+};
+
+const aircraftSpriteKey = (a: Aircraft, time: number): string => {
+  const owner = a.owner === "PLAYER" ? "player" : "enemy";
+  if (a.state === "DEAD") return `unit.aircraft.${owner}.dead`;
+  if (a.state === "FLYING") {
+    return spriteManager.animationFrame(`unit.aircraft.${owner}.flying`, time * 1000)
+      ?? `unit.aircraft.${owner}.flying`;
+  }
+  return `unit.aircraft.${owner}.idle`;
 };
 
 const factionVisuals: Record<Owner, { primary: string; secondary: string; trim: string; glow: string; glass: string }> = {
@@ -1149,6 +1171,60 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
   }
 };
 
+/** Stub renderer — draws atlas when engine later spawns vehicles. */
+const drawVehicle = (ctx: CanvasRenderingContext2D, v: Vehicle, time: number) => {
+  drawEntityShadow(ctx, v.pos.x, v.pos.y, 16, 7);
+  const key = vehicleSpriteKey(v, time);
+  const drew = spriteManager.draw(ctx, key, v.pos.x, v.pos.y, {
+    scale: (TILE_PX / 64) * 1.55,
+    rotation: v.facing ?? 0,
+    alpha: v.state === "DEAD" ? 0.7 : 1,
+  });
+  if (!drew) {
+    const visuals = factionVisuals[v.owner];
+    ctx.save();
+    ctx.fillStyle = visuals.primary;
+    ctx.fillRect(v.pos.x - 12, v.pos.y - 8, 24, 16);
+    ctx.restore();
+  }
+  if (v.hp < v.maxHp && v.state !== "DEAD") {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(v.pos.x - 13, v.pos.y + 16, 26, 3);
+    ctx.fillStyle = v.hp / v.maxHp > 0.35 ? "#22c55e" : "#ef4444";
+    ctx.fillRect(v.pos.x - 13, v.pos.y + 16, 26 * (v.hp / v.maxHp), 3);
+  }
+};
+
+/** Stub renderer — draws atlas when engine later spawns aircraft. */
+const drawAircraft = (ctx: CanvasRenderingContext2D, a: Aircraft, time: number) => {
+  const airborne = a.state === "FLYING";
+  drawEntityShadow(ctx, a.pos.x, a.pos.y + (airborne ? 6 : 2), 14, 5);
+  const key = aircraftSpriteKey(a, time);
+  const drew = spriteManager.draw(ctx, key, a.pos.x, a.pos.y - (airborne ? 4 : 0), {
+    scale: (TILE_PX / 64) * 1.5,
+    rotation: a.facing ?? 0,
+    alpha: a.state === "DEAD" ? 0.65 : 1,
+  });
+  if (!drew) {
+    const visuals = factionVisuals[a.owner];
+    ctx.save();
+    ctx.fillStyle = visuals.secondary;
+    ctx.beginPath();
+    ctx.moveTo(a.pos.x, a.pos.y - 10);
+    ctx.lineTo(a.pos.x + 14, a.pos.y + 6);
+    ctx.lineTo(a.pos.x - 14, a.pos.y + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  if (a.hp < a.maxHp && a.state !== "DEAD") {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(a.pos.x - 13, a.pos.y + 14, 26, 3);
+    ctx.fillStyle = a.hp / a.maxHp > 0.35 ? "#22c55e" : "#ef4444";
+    ctx.fillRect(a.pos.x - 13, a.pos.y + 14, 26 * (a.hp / a.maxHp), 3);
+  }
+};
+
 const drawParticle = (ctx: CanvasRenderingContext2D, p: Particle) => {
   if (p.fx) {
     const frame = spriteManager.animationFrame(`fx.${p.fx}`, p.life * 1000);
@@ -1382,6 +1458,9 @@ export const renderFrame = (
     const isUnderground = (m.layer ?? "SURFACE") === "UNDERGROUND";
     if (!isUnderground || underground || (m.detectedUntil ?? 0) > state.elapsed) drawMech(ctx, m, time);
   }
+  // Vehicles / aircraft (stub entities — empty until gameplay spawns them)
+  for (const v of state.vehicles) drawVehicle(ctx, v, time);
+  for (const a of state.aircraft) drawAircraft(ctx, a, time);
   // Projectiles
   for (const p of state.projectiles) drawProjectile(ctx, p);
   // Particles on top

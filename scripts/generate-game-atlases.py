@@ -1320,6 +1320,188 @@ def make_units(hero_player: Image.Image | None, hero_enemy: Image.Image | None):
     img.save(OUT / "units.png", optimize=True)
 
 
+def _vehicle_apc_frame(palette: dict, pose: str, jagged: bool = False) -> Image.Image:
+    """Chunky tracked APC — reads as a ground vehicle at combat zoom."""
+    w, h = 48, 40
+    img = new_rgba(w, h)
+    d = ImageDraw.Draw(img)
+    # Track bounce / roll phase for moving poses
+    roll = 0
+    if pose == "moving":
+        roll = -2
+    elif pose == "moving2":
+        roll = 2
+    dead = pose == "dead"
+
+    cx, cy = w // 2, h // 2 + 2
+    # Shadow pad
+    d.ellipse([cx - 18, h - 8, cx + 18, h - 2], fill=(0, 0, 0, 90 if not dead else 50))
+
+    # Tracks (left / right)
+    track = palette["dark"] if not dead else shade(palette["dark"], 0.6)
+    track_lit = palette["metal_lit"] if not dead else shade(palette["metal"], 0.7)
+    for side in (-1, 1):
+        tx0 = cx + side * 16 - 5
+        ty0 = cy - 6 + roll
+        d.rounded_rectangle([tx0, ty0, tx0 + 10, ty0 + 22], radius=3, fill=track, outline=palette["trim"])
+        # Road wheels
+        for wi, wy in enumerate((ty0 + 4, ty0 + 11, ty0 + 18)):
+            ox = 1 if (wi + (0 if pose != "moving2" else 1)) % 2 == 0 else 0
+            d.ellipse([tx0 + 1 + ox, wy - 3, tx0 + 8 + ox, wy + 3], fill=track_lit, outline=palette["trim"])
+
+    # Hull
+    hull = palette["olive"] if not dead else shade(palette["olive"], 0.55)
+    hull_lit = palette["olive_lit"] if not dead else shade(palette["olive_lit"], 0.55)
+    d.rounded_rectangle(
+        [cx - 14, cy - 10 + roll, cx + 14, cy + 10 + roll],
+        radius=4,
+        fill=hull,
+        outline=palette["trim"],
+    )
+    d.rectangle([cx - 12, cy - 8 + roll, cx + 12, cy - 2 + roll], fill=hull_lit)
+    # Faction stripe + hazard belt
+    d.rectangle([cx - 12, cy + 2 + roll, cx + 12, cy + 5 + roll], fill=palette["primary"])
+    hazard_strip(d, cx - 11, cy + 6 + roll, cx + 11, cy + 9 + roll, palette, 3)
+
+    # Turret / cupola
+    if not dead:
+        d.ellipse([cx - 7, cy - 14 + roll, cx + 7, cy - 2 + roll], fill=palette["metal"], outline=palette["trim"])
+        d.ellipse([cx - 4, cy - 12 + roll, cx + 4, cy - 5 + roll], fill=palette["metal_lit"])
+        # Barrel pointing right (combat silhouette)
+        barrel_y = cy - 8 + roll
+        reach = 16 if pose != "idle" else 14
+        d.rectangle([cx + 4, barrel_y - 2, cx + reach, barrel_y + 2], fill=palette["metal_lit"], outline=palette["trim"])
+        d.rectangle([cx + reach - 2, barrel_y - 3, cx + reach + 2, barrel_y + 3], fill=palette["secondary"])
+        if pose in ("moving", "moving2"):
+            d.ellipse([cx + reach + 1, barrel_y - 2, cx + reach + 5, barrel_y + 2], fill=palette["glow"])
+        # Antenna / IFF pip
+        d.line([(cx - 5, cy - 14 + roll), (cx - 5, cy - 20 + roll)], fill=palette["secondary"], width=2)
+        d.ellipse([cx - 7, cy - 22 + roll, cx - 3, cy - 18 + roll], fill=palette["primary"])
+    else:
+        # Wreck: cracked hull + smoke puff cue
+        d.line([(cx - 10, cy - 6), (cx + 8, cy + 4)], fill=palette["trim"], width=2)
+        d.line([(cx - 4, cy + 6), (cx + 10, cy - 8)], fill=palette["trim"], width=2)
+        d.ellipse([cx - 6, cy - 16, cx + 8, cy - 4], fill=(60, 60, 64, 140))
+
+    if jagged and not dead:
+        # Enemy spiked bumper
+        for sx in (-10, -2, 6):
+            d.polygon(
+                [(cx + sx, cy + 10 + roll), (cx + sx + 4, cy + 10 + roll), (cx + sx + 2, cy + 14 + roll)],
+                fill=palette["secondary"],
+            )
+    return img
+
+
+def _aircraft_gunship_frame(palette: dict, pose: str, jagged: bool = False) -> Image.Image:
+    """Top-down gunship / attack heli — rotor flipbook for flight."""
+    w, h = 48, 40
+    img = new_rgba(w, h)
+    d = ImageDraw.Draw(img)
+    dead = pose == "dead"
+    cx, cy = w // 2, h // 2
+
+    # Soft ground shadow (higher when "flying")
+    shadow_y = h - 5 if pose == "idle" else h - 3
+    d.ellipse([cx - 14, shadow_y - 3, cx + 14, shadow_y + 2], fill=(0, 0, 0, 70 if not dead else 40))
+
+    # Main rotor disc
+    if not dead:
+        rotor = palette["glass"] if pose == "idle" else (palette["secondary"][0], palette["secondary"][1], palette["secondary"][2], 160)
+        d.ellipse([cx - 18, cy - 16, cx + 18, cy + 8], outline=rotor, width=2)
+        # Blades — alternating angles for flying / flying2
+        angle_a = 0 if pose != "flying2" else 35
+        for deg in (angle_a, angle_a + 90):
+            rad = math.radians(deg)
+            dx, dy = math.cos(rad) * 16, math.sin(rad) * 10
+            d.line([(cx - dx, cy - 4 - dy), (cx + dx, cy - 4 + dy)], fill=palette["metal_lit"], width=3)
+            d.line([(cx - dx, cy - 4 - dy), (cx + dx, cy - 4 + dy)], fill=palette["secondary"], width=1)
+        if pose in ("flying", "flying2"):
+            # Motion blur ring
+            d.ellipse([cx - 20, cy - 18, cx + 20, cy + 10], outline=(palette["glow"][0], palette["glow"][1], palette["glow"][2], 90), width=1)
+
+    # Fuselage
+    body = palette["olive"] if not dead else shade(palette["olive"], 0.5)
+    body_lit = palette["olive_lit"] if not dead else shade(palette["olive_lit"], 0.5)
+    d.polygon(
+        [
+            (cx - 4, cy - 12),
+            (cx + 4, cy - 12),
+            (cx + 10, cy - 2),
+            (cx + 8, cy + 12),
+            (cx - 8, cy + 12),
+            (cx - 10, cy - 2),
+        ],
+        fill=body,
+        outline=palette["trim"],
+    )
+    d.polygon(
+        [(cx - 3, cy - 10), (cx + 3, cy - 10), (cx + 5, cy - 2), (cx - 5, cy - 2)],
+        fill=body_lit,
+    )
+    # Cockpit glass
+    d.ellipse([cx - 5, cy - 10, cx + 5, cy - 2], fill=palette["glass"], outline=palette["trim"])
+    # Faction stripe
+    d.rectangle([cx - 6, cy + 2, cx + 6, cy + 5], fill=palette["primary"])
+    # Stub wings + hardpoints
+    wing_y = cy + 2
+    for side in (-1, 1):
+        d.polygon(
+            [
+                (cx + side * 6, wing_y - 2),
+                (cx + side * 18, wing_y),
+                (cx + side * 18, wing_y + 4),
+                (cx + side * 6, wing_y + 3),
+            ],
+            fill=palette["metal"],
+            outline=palette["trim"],
+        )
+        # Missile hardpoint
+        d.rectangle([cx + side * 14 - 2, wing_y + 4, cx + side * 14 + 2, wing_y + 10], fill=palette["metal_lit"])
+        if jagged and not dead:
+            d.polygon(
+                [
+                    (cx + side * 18, wing_y),
+                    (cx + side * 22, wing_y + 2),
+                    (cx + side * 18, wing_y + 4),
+                ],
+                fill=palette["secondary"],
+            )
+
+    # Tail boom + tail rotor
+    d.rectangle([cx - 2, cy + 10, cx + 2, cy + 18], fill=palette["metal"], outline=palette["trim"])
+    if not dead:
+        tr = 5 if pose != "flying2" else 4
+        d.ellipse([cx - tr, cy + 16, cx + tr, cy + 16 + tr + 2], outline=palette["secondary"], width=2)
+        d.line([(cx - tr, cy + 17 + tr // 2), (cx + tr, cy + 17 + tr // 2)], fill=palette["metal_lit"], width=2)
+    else:
+        d.line([(cx - 8, cy - 6), (cx + 10, cy + 8)], fill=palette["trim"], width=2)
+        d.ellipse([cx - 4, cy - 14, cx + 10, cy - 2], fill=(50, 50, 55, 130))
+
+    # Nose IFF light
+    if not dead:
+        d.ellipse([cx - 2, cy - 14, cx + 2, cy - 10], fill=palette["primary"])
+    return img
+
+
+def make_vehicles():
+    """APC + gunship atlases — gameplay may stub; sprites are hot-swappable."""
+    vehicle_poses = ["idle", "moving", "moving2", "dead"]
+    aircraft_poses = ["idle", "flying", "flying2", "dead"]
+    cell_w, cell_h = 48, 40
+    # Rows: player vehicle, enemy vehicle, player aircraft, enemy aircraft
+    img = new_rgba(cell_w * max(len(vehicle_poses), len(aircraft_poses)), cell_h * 4)
+    for oi, (pal, jagged) in enumerate(((PLAYER, False), (ENEMY, True))):
+        for pi, pose in enumerate(vehicle_poses):
+            frame = _vehicle_apc_frame(pal, pose, jagged=jagged)
+            img.paste(frame, (pi * cell_w, oi * cell_h), frame)
+        for pi, pose in enumerate(aircraft_poses):
+            frame = _aircraft_gunship_frame(pal, pose, jagged=jagged)
+            img.paste(frame, (pi * cell_w, (oi + 2) * cell_h), frame)
+    img.save(OUT / "vehicles.png", optimize=True)
+    print(f"  vehicles.png: {img.size}")
+
+
 def _draw_missile_body(
     d: ImageDraw.ImageDraw,
     x: int,
@@ -1663,6 +1845,7 @@ def main():
         native_enemy_labels=native_enemy_labels,
     )
     make_units(mech_p, mech_e)
+    make_vehicles()
     make_projectiles()
     make_fx()
     make_ui()

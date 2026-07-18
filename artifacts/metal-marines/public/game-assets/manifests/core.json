@@ -4,6 +4,7 @@
     "buildings-player": "/game-assets/buildings-player.png",
     "buildings-enemy": "/game-assets/buildings-enemy.png",
     "units": "/game-assets/units.png",
+    "vehicles": "/game-assets/vehicles.png",
     "projectiles": "/game-assets/projectiles.png",
     "fx": "/game-assets/fx.png",
     "ui": "/game-assets/ui.png"
@@ -241,6 +242,26 @@
     "unit.mech.enemy.boarding": { "atlas": "units", "x": 200, "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
     "unit.mech.enemy.dead": { "atlas": "units", "x": 240, "y": 48, "w": 40, "h": 48, "anchorX": 0.5, "anchorY": 0.85 },
 
+    "unit.vehicle.player.idle": { "atlas": "vehicles", "x": 0, "y": 0, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+    "unit.vehicle.player.moving": { "atlas": "vehicles", "x": 48, "y": 0, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+    "unit.vehicle.player.moving2": { "atlas": "vehicles", "x": 96, "y": 0, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+    "unit.vehicle.player.dead": { "atlas": "vehicles", "x": 144, "y": 0, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+
+    "unit.vehicle.enemy.idle": { "atlas": "vehicles", "x": 0, "y": 40, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+    "unit.vehicle.enemy.moving": { "atlas": "vehicles", "x": 48, "y": 40, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+    "unit.vehicle.enemy.moving2": { "atlas": "vehicles", "x": 96, "y": 40, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+    "unit.vehicle.enemy.dead": { "atlas": "vehicles", "x": 144, "y": 40, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.8 },
+
+    "unit.aircraft.player.idle": { "atlas": "vehicles", "x": 0, "y": 80, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+    "unit.aircraft.player.flying": { "atlas": "vehicles", "x": 48, "y": 80, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+    "unit.aircraft.player.flying2": { "atlas": "vehicles", "x": 96, "y": 80, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+    "unit.aircraft.player.dead": { "atlas": "vehicles", "x": 144, "y": 80, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+
+    "unit.aircraft.enemy.idle": { "atlas": "vehicles", "x": 0, "y": 120, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+    "unit.aircraft.enemy.flying": { "atlas": "vehicles", "x": 48, "y": 120, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+    "unit.aircraft.enemy.flying2": { "atlas": "vehicles", "x": 96, "y": 120, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+    "unit.aircraft.enemy.dead": { "atlas": "vehicles", "x": 144, "y": 120, "w": 48, "h": 40, "anchorX": 0.5, "anchorY": 0.55 },
+
     "projectile.icbm": { "atlas": "projectiles", "x": 0, "y": 0, "w": 32, "h": 56 },
     "projectile.emp": { "atlas": "projectiles", "x": 32, "y": 0, "w": 40, "h": 56 },
     "projectile.transport_pod": { "atlas": "projectiles", "x": 72, "y": 0, "w": 40, "h": 56 },
@@ -279,6 +300,10 @@
     "unit.mech.enemy.fighting": { "frames": ["unit.mech.enemy.fighting", "unit.mech.enemy.fighting2"], "frameMs": 75, "loop": true },
     "unit.mech.enemy.attacking": { "frames": ["unit.mech.enemy.fighting", "unit.mech.enemy.fighting2"], "frameMs": 75, "loop": true },
     "unit.mech.enemy.landing": { "frames": ["unit.mech.enemy.boarding"], "frameMs": 100, "loop": false },
+    "unit.vehicle.player.moving": { "frames": ["unit.vehicle.player.moving", "unit.vehicle.player.moving2"], "frameMs": 120, "loop": true },
+    "unit.vehicle.enemy.moving": { "frames": ["unit.vehicle.enemy.moving", "unit.vehicle.enemy.moving2"], "frameMs": 120, "loop": true },
+    "unit.aircraft.player.flying": { "frames": ["unit.aircraft.player.flying", "unit.aircraft.player.flying2"], "frameMs": 80, "loop": true },
+    "unit.aircraft.enemy.flying": { "frames": ["unit.aircraft.enemy.flying", "unit.aircraft.enemy.flying2"], "frameMs": 80, "loop": true },
     "fx.explosion": { "frames": ["fx.explosion.0", "fx.explosion.1", "fx.explosion.2", "fx.explosion.3", "fx.explosion.4", "fx.explosion.5", "fx.explosion.6", "fx.explosion.7"], "frameMs": 50, "loop": false },
     "fx.smoke": { "frames": ["fx.smoke.0", "fx.smoke.1", "fx.smoke.2", "fx.smoke.3", "fx.smoke.4", "fx.smoke.5"], "frameMs": 80, "loop": false },
     "fx.muzzle": { "frames": ["fx.muzzle.0", "fx.muzzle.1", "fx.muzzle.2", "fx.muzzle.3"], "frameMs": 40, "loop": false }

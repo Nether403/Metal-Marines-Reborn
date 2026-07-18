@@ -59,8 +59,8 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - [x] Terrain sheet slices + EMP/Dummy heroes + denser HQ/airspace read
 - [x] Sample banks for launch / explode / land hot-swapped behind `sfx()`
 - See `AGENTS.md` backlog for Automation-driven next picks.
+- [x] Vehicles / aircraft sprites (gameplay stubbed; atlas hot-swappable)
 - [ ] True isometric camera (optional)
-- [ ] Vehicles / aircraft
 - [ ] Multiplayer / replay foundation
 
 ## Validation commands
