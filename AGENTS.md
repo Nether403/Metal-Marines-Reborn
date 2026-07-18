@@ -26,8 +26,8 @@ and record why in Memories.
 #### P0 — Battlefield still feels sparse / soft
 1. [x] Forest tiles: denser canopy clumps that read as trees at combat zoom (not
       green blobs). Regenerate terrain atlas; hard-refresh proof screenshot.
-2. [ ] Building damaged/construction/disabled states: hero-quality frames (not
-      just tint overlays) for HQ, Energy, Missile, Turret at minimum.
+2. [x] Building damaged/construction/disabled states: hero-quality frames (not
+   just tint overlays) for HQ, Energy, Missile, Turret at minimum.
 3. [ ] Projectile + FX atlas upgrade: thicker missiles, bigger explosion flipbooks,
       visible mech drop pods (battlefeel vs SNES remake).
 4. [ ] Mech walk/fight frames: distinct poses from hero art (not rotate/tint of idle).
