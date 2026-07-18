@@ -275,4 +275,60 @@ assert.ok(
   assert.equal(locked!.side, "ENEMY", "gunship should target the enemy island");
 }
 
+// --- AA↔gunship readability FX (tracers + sparks, deterministic) ---
+{
+  const mission = idleMission("aa-gunship-fx", 1, 0.1, 0.8);
+  const state = createMissionRuntime(mission);
+  state.buildings.push({
+    id: "aa_home",
+    type: "AA_GUN",
+    side: "PLAYER",
+    owner: "PLAYER",
+    pos: { x: 5, y: 4 },
+    footprintW: 1,
+    footprintH: 1,
+    hp: BUILDINGS.AA_GUN.maxHp,
+    maxHp: BUILDINGS.AA_GUN.maxHp,
+    buildTimeRemaining: 0,
+    buildTimeTotal: 0,
+    cooldown: 0,
+  });
+  const hq = state.buildings.find((b) => b.type === "HQ" && b.side === "PLAYER");
+  // Hostile gunship already over the player island (world coords)
+  state.aircraft.push({
+    id: "hostile_gs",
+    owner: "ENEMY",
+    side: "PLAYER",
+    pos: { x: 5 * 64 + 32, y: 4 * 64 + 32 },
+    hp: 95,
+    maxHp: 95,
+    state: "FLYING",
+    facing: 0,
+    attackCooldown: 99,
+    targetBuildingId: hq?.id,
+  });
+  const hpBefore = state.aircraft[0].hp;
+  const h0 = hashRuntimeFrame(state);
+  // Short steps so tracers (maxLife ~0.22s) are still alive when we inspect
+  for (let t = 0; t < 0.35; t += 0.05) stepGame(state, mission, 0.05);
+  const tracers = state.particles.filter((p) => p.kind === "tracer" || p.kind === "spark");
+  assert.ok(
+    tracers.length > 0 || state.buildings.find((b) => b.id === "aa_home")!.cooldown > 0,
+    "AA should engage hostile gunship (tracers/sparks or cooldown)"
+  );
+  assert.ok(
+    state.aircraft[0].hp < hpBefore || state.buildings.find((b) => b.id === "aa_home")!.cooldown > 0,
+    "AA engagement should damage gunship or put AA on cooldown"
+  );
+  // Continue until alert fires (detectIncoming has its own cadence)
+  for (let t = 0; t < 3; t += 0.25) stepGame(state, mission, 0.25);
+  assert.ok(
+    state.alerts.some((a) => a.text.includes("HOSTILE GUNSHIP")),
+    "hostile gunship over base should raise a combat alert"
+  );
+  const h1 = hashRuntimeFrame(state);
+  assert.equal(h1, hashRuntimeFrame(state), "post-AA gunship hash stays stable");
+  assert.notEqual(h0, h1, "AA engagement should change runtime hash (damage/cooldown)");
+}
+
 console.log("game determinism checks passed");
