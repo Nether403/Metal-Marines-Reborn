@@ -120,28 +120,57 @@ const drawGrassDetails = (ctx: CanvasRenderingContext2D, px: number, py: number,
 };
 
 const drawForestDetails = (ctx: CanvasRenderingContext2D, px: number, py: number, x: number, y: number) => {
+  // Dense canopy clumps that read as trees at combat zoom (fallback path).
   const canopy = [
-    [0.26, 0.3, 10],
-    [0.54, 0.25, 12],
-    [0.74, 0.48, 10],
-    [0.38, 0.62, 13],
-    [0.62, 0.76, 9],
+    [0.16, 0.18, 8],
+    [0.42, 0.14, 9],
+    [0.7, 0.2, 8],
+    [0.28, 0.38, 10],
+    [0.56, 0.36, 11],
+    [0.8, 0.42, 9],
+    [0.14, 0.58, 9],
+    [0.4, 0.62, 10],
+    [0.66, 0.58, 11],
+    [0.22, 0.82, 9],
+    [0.5, 0.84, 10],
+    [0.78, 0.8, 9],
   ] as const;
   for (const [rx, ry, r] of canopy) {
     const jitter = terrainHash(x, y, rx + ry);
-    const cx = px + TILE_PX * rx + (jitter - 0.5) * 5;
-    const cy = py + TILE_PX * ry + (jitter - 0.5) * 4;
-    const grad = ctx.createRadialGradient(cx - 3, cy - 4, 2, cx, cy, r);
-    grad.addColorStop(0, "#34d399");
-    grad.addColorStop(0.55, "#166534");
-    grad.addColorStop(1, "#052e1d");
+    const cx = px + TILE_PX * rx + (jitter - 0.5) * 4;
+    const cy = py + TILE_PX * ry + (jitter - 0.5) * 3;
+    // shadow / trunk stub
+    ctx.fillStyle = "rgba(6,18,10,0.55)";
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + r * 0.45, r * 0.7, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(62,44,28,0.75)";
+    ctx.fillRect(cx - 1, cy + r * 0.15, 2, r * 0.35);
+    // silhouette + lit crown
+    const grad = ctx.createRadialGradient(cx - 3, cy - 4, 1.5, cx, cy, r);
+    grad.addColorStop(0, "#86efac");
+    grad.addColorStop(0.35, "#22c55e");
+    grad.addColorStop(0.7, "#166534");
+    grad.addColorStop(1, "#052e16");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
+    // scallop lobes so crowns aren't soft discs
+    for (let i = 0; i < 5; i++) {
+      const ang = (i / 5) * Math.PI * 2 + jitter;
+      const lx = cx + Math.cos(ang) * r * 0.55;
+      const ly = cy + Math.sin(ang) * r * 0.48;
+      ctx.fillStyle = i % 2 === 0 ? "rgba(34,102,48,0.85)" : "rgba(20,70,34,0.9)";
+      ctx.beginPath();
+      ctx.arc(lx, ly, Math.max(2.5, r * 0.38), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(187,247,208,0.55)";
+    ctx.beginPath();
+    ctx.arc(cx - 2, cy - r * 0.45, Math.max(1.5, r * 0.22), 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.fillStyle = "rgba(3,7,18,0.24)";
-  ctx.fillRect(px + 6, py + TILE_PX - 8, TILE_PX - 12, 3);
 };
 
 const drawMountainDetails = (ctx: CanvasRenderingContext2D, px: number, py: number, x: number, y: number) => {
