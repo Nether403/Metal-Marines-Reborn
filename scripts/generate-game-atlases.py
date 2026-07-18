@@ -32,6 +32,10 @@ HERO_BUILDINGS = {
     "MECHBAY": "factory-player",
     "JAMMER": "jammer-player",
     "TUNNEL": "tunnel-player",
+    "SEISMIC": "seismic-player",
+    "DESTAB": "destab-player",
+    "WEATHER": "weather-player",
+    "BIO": "biosphere-player",
 }
 
 # icons exported for BuildPalette (BuildingType -> atlas label)
