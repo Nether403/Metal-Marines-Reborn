@@ -62,6 +62,22 @@ const HOTKEYS_WEAPON: Record<string, string> = {
   t: "EMP",
   y: "TUNNEL_BUSTER",
 };
+/** Strike Control — Gunner tier / loadout / Factory doctrine (no letter collisions with build/weapon). */
+const HOTKEYS_MECH_TIER: Record<string, "GUNNER_I" | "GUNNER_II"> = {
+  z: "GUNNER_I",
+  x: "GUNNER_II",
+};
+const HOTKEYS_MECH_MODE: Record<string, "NORMAL" | "ANTI_MMR" | "ANTI_POD"> = {
+  n: "NORMAL",
+  m: "ANTI_MMR",
+  p: "ANTI_POD",
+};
+const HOTKEYS_FACTORY: Record<string, "AUTO" | "APC" | "GUNSHIP" | "HOLD"> = {
+  o: "AUTO",
+  a: "APC",
+  s: "GUNSHIP",
+  h: "HOLD",
+};
 
 export default function Play() {
   const [, params] = useRoute("/play/:missionId");
@@ -80,6 +96,9 @@ export default function Play() {
   const tryInterceptAt = useGame((s) => s.tryInterceptAt);
   const selectBuild = useGame((s) => s.selectBuild);
   const selectWeapon = useGame((s) => s.selectWeapon);
+  const selectMechTier = useGame((s) => s.selectMechTier);
+  const selectMechWeapon = useGame((s) => s.selectMechWeapon);
+  const setFactoryDoctrine = useGame((s) => s.setFactoryDoctrine);
   const setViewLayer = useGame((s) => s.setViewLayer);
   const clearSnapshot = useGame((s) => s.clearSnapshot);
 
@@ -252,6 +271,18 @@ export default function Play() {
         if (rt) setViewLayer(rt.viewLayer === "SURFACE" ? "UNDERGROUND" : "SURFACE");
         return;
       }
+      if (HOTKEYS_MECH_TIER[k]) {
+        selectMechTier(HOTKEYS_MECH_TIER[k]);
+        return;
+      }
+      if (HOTKEYS_MECH_MODE[k]) {
+        selectMechWeapon(HOTKEYS_MECH_MODE[k]);
+        return;
+      }
+      if (HOTKEYS_FACTORY[k]) {
+        setFactoryDoctrine(HOTKEYS_FACTORY[k]);
+        return;
+      }
       const buildType = HOTKEYS_BUILD[e.key] ?? HOTKEYS_BUILD[k];
       if (buildType) {
         selectBuild(buildType as keyof typeof BUILDINGS);
@@ -261,7 +292,15 @@ export default function Play() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectBuild, selectWeapon, setPaused, setViewLayer]);
+  }, [
+    selectBuild,
+    selectWeapon,
+    selectMechTier,
+    selectMechWeapon,
+    setFactoryDoctrine,
+    setPaused,
+    setViewLayer,
+  ]);
 
   if (!missionId) {
     setLocation("/campaign");

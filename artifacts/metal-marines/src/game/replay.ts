@@ -9,6 +9,7 @@ import type {
   BuildingType,
   FactoryDoctrine,
   GunshipStrikePriority,
+  MechTier,
   MechWeaponMode,
   MissionDef,
   ProjectileType,
@@ -109,6 +110,8 @@ export const runtimeDeterminismView = (state: RuntimeState) => ({
       x: stableNumber(m.pos.x),
       y: stableNumber(m.pos.y),
       hp: stableNumber(m.hp),
+      tier: m.tier,
+      weaponMode: m.weaponMode,
       layer: m.layer ?? "SURFACE",
       state: m.state,
     }))
@@ -194,6 +197,8 @@ export const formatReplayCommandLine = (command: ReplayCommand): string => {
     case "SELECT_WEAPON":
       if (payload.mode != null && payload.mode !== "") return `${f} MECH_MODE ${payload.mode}`;
       return `${f} SELECT_WEAPON ${payload.type ?? "none"}`;
+    case "SELECT_MECH_TIER":
+      return `${f} MECH_TIER ${payload.tier ?? "?"}`;
     case "SET_VIEW_LAYER":
       return `${f} VIEW ${payload.layer ?? "?"}`;
     case "SET_FACTORY_DOCTRINE":
@@ -228,6 +233,11 @@ export const applyReplayCommand = (state: RuntimeState, command: ReplayCommand):
       }
       state.selectedWeapon = String(payload.type) as ProjectileType;
       state.selectedBuild = null;
+      return true;
+    }
+    case "SELECT_MECH_TIER": {
+      if (payload.tier == null || payload.tier === "") return false;
+      state.selectedMechTier = String(payload.tier) as MechTier;
       return true;
     }
     case "SET_VIEW_LAYER": {
