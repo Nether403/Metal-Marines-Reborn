@@ -597,23 +597,270 @@ BUILDING_ROWS = [
 ]
 STATES = ["idle", "damaged", "construction", "disabled"]
 
+# Priority P0 buildings get the richest state frames; others still get compositing.
+PRIORITY_STATE_LABELS = {"HQ", "ENERGY", "MISSILE", "TURRET", "ICBM"}
 
-def tint_state(cell: Image.Image, state: str) -> Image.Image:
+
+def _opaque_bbox(cell: Image.Image) -> tuple[int, int, int, int] | None:
+    """Return (x0,y0,x1,y1) covering opaque pixels, or None if empty."""
+    px = cell.load()
+    w, h = cell.size
+    xs, ys = [], []
+    for y in range(h):
+        for x in range(w):
+            if px[x, y][3] > 24:
+                xs.append(x)
+                ys.append(y)
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _punch_hole(cell: Image.Image, poly: list[tuple[int, int]], soft: int = 1) -> None:
+    """Cut a jagged hole out of the silhouette (alpha → 0)."""
+    mask = new_rgba(*cell.size)
+    md = ImageDraw.Draw(mask)
+    md.polygon(poly, fill=(0, 0, 0, 255))
+    if soft > 0:
+        # slightly expand for readable bite at 64px
+        md.line(poly + [poly[0]], fill=(0, 0, 0, 255), width=soft)
+    mp = mask.load()
+    px = cell.load()
+    w, h = cell.size
+    for y in range(h):
+        for x in range(w):
+            if mp[x, y][3] > 0 and px[x, y][3] > 0:
+                r, g, b, a = px[x, y]
+                px[x, y] = (r, g, b, 0)
+
+
+def _scorch_patch(cell: Image.Image, cx: int, cy: int, rx: int, ry: int, strength: float = 0.35) -> None:
+    """Darken an elliptical burn patch in place."""
+    px = cell.load()
+    w, h = cell.size
+    for y in range(max(0, cy - ry - 1), min(h, cy + ry + 2)):
+        for x in range(max(0, cx - rx - 1), min(w, cx + rx + 2)):
+            r, g, b, a = px[x, y]
+            if a < 16:
+                continue
+            nx = (x - cx) / max(1, rx)
+            ny = (y - cy) / max(1, ry)
+            if nx * nx + ny * ny > 1.0:
+                continue
+            fall = 1.0 - math.sqrt(nx * nx + ny * ny)
+            f = 1.0 - strength * fall
+            px[x, y] = (
+                max(0, int(r * f)),
+                max(0, int(g * f * 0.92)),
+                max(0, int(b * f * 0.85)),
+                a,
+            )
+
+
+def hero_state_frame(
+    cell: Image.Image,
+    state: str,
+    label: str,
+    palette,
+) -> Image.Image:
+    """Compose distinct damaged / construction / disabled frames from a hero idle cell.
+
+    Tint-only overlays are not enough at combat zoom — silhouettes and mass must change.
+    """
     if state == "idle":
         return cell
+
+    w, h = cell.size
+    bbox = _opaque_bbox(cell)
+    if bbox is None:
+        return cell
+    x0, y0, x1, y1 = bbox
+    bw, bh = max(1, x1 - x0), max(1, y1 - y0)
+    rich = label in PRIORITY_STATE_LABELS
     out = cell.copy()
+
     if state == "damaged":
-        out = ImageEnhance.Brightness(out).enhance(0.72)
+        # Scorch + crush brightness so hull reads wounded before we bite chunks.
+        out = ImageEnhance.Brightness(out).enhance(0.78 if rich else 0.82)
+        out = ImageEnhance.Color(out).enhance(0.85)
+        _scorch_patch(out, x0 + bw // 3, y0 + bh // 3, max(6, bw // 5), max(5, bh // 6), 0.55)
+        _scorch_patch(out, x0 + (2 * bw) // 3, y0 + bh // 2, max(5, bw // 6), max(4, bh // 7), 0.42)
+
+        # Bite chunks out of the roof / upper mass — silhouette must change.
+        bites = [
+            [
+                (x0 + int(bw * 0.55), y0 + 1),
+                (x0 + int(bw * 0.78), y0 + int(bh * 0.08)),
+                (x0 + int(bw * 0.92), y0 + int(bh * 0.22)),
+                (x0 + int(bw * 0.70), y0 + int(bh * 0.28)),
+                (x0 + int(bw * 0.52), y0 + int(bh * 0.18)),
+            ],
+            [
+                (x0 + int(bw * 0.08), y0 + int(bh * 0.20)),
+                (x0 + int(bw * 0.22), y0 + int(bh * 0.12)),
+                (x0 + int(bw * 0.34), y0 + int(bh * 0.30)),
+                (x0 + int(bw * 0.18), y0 + int(bh * 0.38)),
+            ],
+        ]
+        if rich:
+            bites.append(
+                [
+                    (x0 + int(bw * 0.40), y0 + int(bh * 0.02)),
+                    (x0 + int(bw * 0.58), y0 + int(bh * 0.00)),
+                    (x0 + int(bw * 0.62), y0 + int(bh * 0.14)),
+                    (x0 + int(bw * 0.44), y0 + int(bh * 0.16)),
+                ]
+            )
+        for poly in bites:
+            _punch_hole(out, poly, soft=2 if rich else 1)
+
         d = ImageDraw.Draw(out)
-        d.line([(8, 12), (52, 50)], fill=(20, 20, 25, 200), width=2)
+        # Crack polylines through remaining mass
+        cracks = [
+            [
+                (x0 + int(bw * 0.22), y0 + int(bh * 0.18)),
+                (x0 + int(bw * 0.38), y0 + int(bh * 0.42)),
+                (x0 + int(bw * 0.30), y0 + int(bh * 0.68)),
+            ],
+            [
+                (x0 + int(bw * 0.62), y0 + int(bh * 0.25)),
+                (x0 + int(bw * 0.78), y0 + int(bh * 0.48)),
+                (x0 + int(bw * 0.70), y0 + int(bh * 0.72)),
+            ],
+        ]
+        for pts in cracks:
+            d.line(pts, fill=(18, 14, 16, 230), width=2)
+            d.line([(p[0] + 1, p[1]) for p in pts], fill=(55, 30, 28, 160), width=1)
+
+        # Rubble / debris at the pad
+        rubble_y = min(h - 3, y1 - 2)
+        for i, rx in enumerate((x0 + 4, x0 + bw // 2 - 3, x1 - 10)):
+            rw = 5 + (i % 3)
+            d.ellipse([rx, rubble_y - 3, rx + rw, rubble_y + 2], fill=(42, 40, 38, 210))
+            d.rectangle([rx + 1, rubble_y - 5, rx + rw - 1, rubble_y - 1], fill=(60, 55, 50, 190))
+
+        # Smoke puffs rising from the wound (priority buildings)
+        if rich:
+            for sx, sy, rr in (
+                (x0 + int(bw * 0.72), y0 + int(bh * 0.10), 5),
+                (x0 + int(bw * 0.80), y0 - 2, 4),
+                (x0 + int(bw * 0.66), y0 - 4, 3),
+            ):
+                d.ellipse([sx - rr, sy - rr, sx + rr, sy + rr], fill=(70, 72, 78, 110))
+                d.ellipse([sx - rr + 2, sy - rr - 2, sx + rr - 1, sy + rr - 2], fill=(90, 92, 98, 70))
+
     elif state == "construction":
-        out = ImageEnhance.Color(out).enhance(0.5)
+        # Incomplete mass: keep only the lower portion of the hero, fade the rest.
+        cut = y0 + int(bh * (0.42 if rich else 0.50))
+        px = out.load()
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a < 8:
+                    continue
+                if y < cut:
+                    # upper mass gone / ghost scaffolding only
+                    fade = max(0, int(a * (0.08 if y < cut - 6 else 0.22)))
+                    px[x, y] = (r, g, b, fade)
+                else:
+                    # unfinished hull — desat + slight transparency
+                    grey = (r + g + b) // 3
+                    nr = int(r * 0.45 + grey * 0.35 + 40)
+                    ng = int(g * 0.45 + grey * 0.35 + 45)
+                    nb = int(b * 0.45 + grey * 0.35 + 55)
+                    px[x, y] = (min(255, nr), min(255, ng), min(255, nb), min(255, int(a * 0.88)))
+
         d = ImageDraw.Draw(out)
-        d.line([(6, 10), (56, 54)], fill=(120, 200, 255, 180), width=2)
+        # Steel frame / rebar rising above the cut
+        frame_top = max(2, y0 + 2)
+        posts = [x0 + 6, x0 + bw // 2, x1 - 6]
+        for px_ in posts:
+            d.line([(px_, cut), (px_, frame_top)], fill=(150, 165, 180, 220), width=2)
+        # Cross braces
+        d.line([(posts[0], cut - 4), (posts[2], frame_top + 6)], fill=(120, 200, 255, 200), width=2)
+        d.line([(posts[2], cut - 4), (posts[0], frame_top + 6)], fill=(120, 200, 255, 160), width=1)
+        # Horizontal beams
+        for by in (frame_top + 4, (frame_top + cut) // 2, cut - 2):
+            d.line([(posts[0], by), (posts[2], by)], fill=(170, 180, 195, 200), width=1)
+
+        # Hazard stripe pad at the base
+        hazard_strip(d, x0 + 2, min(h - 4, y1 - 1), x1 - 2, min(h - 2, y1 + 2), palette, 4)
+        # Crane hook / lifting triangle (reads “under construction” at 64px)
+        if rich:
+            hx = x0 + bw // 2
+            d.polygon(
+                [(hx, frame_top - 1), (hx - 5, frame_top + 7), (hx + 5, frame_top + 7)],
+                fill=(245, 200, 60, 230),
+            )
+            d.line([(hx, frame_top + 7), (hx, cut - 8)], fill=(200, 200, 210, 180), width=1)
+
     elif state == "disabled":
-        out = ImageEnhance.Brightness(out).enhance(0.55)
-        out = ImageEnhance.Color(out).enhance(0.35)
+        # Heavy desat + dim — systems offline
+        out = ImageEnhance.Brightness(out).enhance(0.52)
+        out = ImageEnhance.Color(out).enhance(0.28)
+        # Crush remaining chroma toward cold steel
+        px = out.load()
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a < 8:
+                    continue
+                grey = (r + g + b) // 3
+                nr = int(grey * 0.75 + 18)
+                ng = int(grey * 0.78 + 22)
+                nb = int(grey * 0.88 + 40)
+                px[x, y] = (nr, ng, nb, a)
+
+        d = ImageDraw.Draw(out)
+        # Dark offline panel bolted on the facade
+        panel_w = max(14, bw // 3)
+        panel_h = max(8, bh // 5)
+        pcx = x0 + bw // 2
+        pcy = y0 + bh // 2
+        d.rectangle(
+            [pcx - panel_w // 2, pcy - panel_h // 2, pcx + panel_w // 2, pcy + panel_h // 2],
+            fill=(28, 32, 40, 220),
+            outline=(90, 100, 120, 230),
+        )
+        # Red “offline” LED + cyan EMP arcs for battle readability
+        d.ellipse([pcx - 3, pcy - 3, pcx + 3, pcy + 3], fill=(200, 40, 50, 240))
+        cyan = (80, 220, 240, 210) if faction_is_player_palette(palette) else (180, 140, 255, 210)
+        # EMP lightning arcs that extend past the hull (silhouette change)
+        arcs = [
+            [
+                (x0 - 2, y0 + bh // 3),
+                (x0 + int(bw * 0.25), y0 + int(bh * 0.20)),
+                (x0 + int(bw * 0.45), y0 + int(bh * 0.45)),
+            ],
+            [
+                (x1 + 2, y0 + bh // 4),
+                (x0 + int(bw * 0.75), y0 + int(bh * 0.35)),
+                (x0 + int(bw * 0.55), y0 + int(bh * 0.55)),
+            ],
+        ]
+        if rich:
+            arcs.append(
+                [
+                    (pcx - 10, y0 - 3),
+                    (pcx - 2, y0 + 8),
+                    (pcx + 8, y0 + 2),
+                    (pcx + 14, y0 + 14),
+                ]
+            )
+        for pts in arcs:
+            d.line(pts, fill=cyan, width=2)
+            d.line([(p[0], p[1] + 1) for p in pts], fill=(*cyan[:3], 100), width=1)
+        # Corner sparks
+        for sx, sy in ((x0 + 2, y0 + 4), (x1 - 4, y0 + 6), (pcx, y0 - 1)):
+            d.ellipse([sx, sy, sx + 3, sy + 3], fill=cyan)
+
     return out
+
+
+def faction_is_player_palette(palette) -> bool:
+    """Heuristic: player glow is warm/red; enemy glow is purple."""
+    g = palette.get("glow", (0, 0, 0, 0))
+    return g[0] > g[2]
 
 
 def make_buildings(
@@ -633,7 +880,12 @@ def make_buildings(
         hero = heroes.get(label)
         for si, state in enumerate(STATES):
             if hero is not None:
-                cell = tint_state(fit_rgba(hero, 64, h, pad=1), state)
+                cell = hero_state_frame(
+                    fit_rgba(hero, 64, h, pad=1),
+                    state,
+                    label,
+                    palette,
+                )
             else:
                 cell = building_block(palette, label, state, 64, h, faction=faction)
             if state == "idle":
@@ -704,7 +956,12 @@ def make_units(hero_player: Image.Image | None, hero_enemy: Image.Image | None):
             if hero is not None and pose == "idle":
                 frame = fit_rgba(hero, 40, 48, pad=1)
             elif hero is not None and pose != "dead":
-                frame = tint_state(fit_rgba(hero, 40, 48, pad=1), "damaged" if pose == "fighting" else "idle")
+                frame = fit_rgba(hero, 40, 48, pad=1)
+                if pose == "fighting":
+                    # Temporary until P0 #4 ships distinct fight poses.
+                    frame = ImageEnhance.Brightness(frame).enhance(0.85)
+                    fd = ImageDraw.Draw(frame)
+                    fd.line([(6, 10), (34, 38)], fill=(20, 20, 25, 160), width=1)
                 if pose == "walking":
                     frame = frame.rotate(4 if oi == 0 else -4, resample=Image.Resampling.BICUBIC, expand=False)
             else:
