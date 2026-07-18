@@ -54,8 +54,9 @@ This roadmap tracks Metal Marines Reborn from a playable Canvas prototype toward
 - [x] Platform-pad terrain, building shadows/pads, larger mechs with M.MARINE callouts, build-palette icons
 - [x] Systems heroes: Jammer + Tunnel Gate (+ enemy recolors)
 - [x] Battlefeel: animated water shimmer, stronger shoreline foam, softer fog
-- [ ] Remaining ecology heroes (Seismic, Destabilizer, Weather, Biosphere)
-- [ ] Sample-based SFX upgrade (still synthesized)
+- [x] Ecology heroes: Seismic, Destabilizer, Weather, Biosphere (+ enemy recolors)
+- [x] Richer layered synthesized SFX (sample hot-swap still later)
+- [ ] Optional: real sample banks for launch / explode / land
 - [ ] True isometric camera (optional)
 - [ ] Vehicles / aircraft
 - [ ] Multiplayer / replay foundation

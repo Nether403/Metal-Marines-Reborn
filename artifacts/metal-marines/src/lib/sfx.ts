@@ -1,4 +1,4 @@
-/** Richer synthesized SFX (noise bursts + layered tones) — hot-swappable later for real samples. */
+/** Layered synthesized SFX — API is stable for later sample hot-swap. */
 
 const audioCtx: AudioContext | null =
   typeof window !== "undefined" && "AudioContext" in window
@@ -29,7 +29,10 @@ const tone = (
     osc.type = type;
     osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
     if (freqEnd != null) {
-      osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), audioCtx.currentTime + duration);
+      osc.frequency.exponentialRampToValueAtTime(
+        Math.max(20, freqEnd),
+        audioCtx.currentTime + duration
+      );
     }
     g.gain.value = gain;
     osc.connect(g);
@@ -42,7 +45,7 @@ const tone = (
   }
 };
 
-const noiseBurst = (duration: number, gain = 0.08, filterFreq = 800) => {
+const noiseBurst = (duration: number, gain = 0.08, filterFreq = 800, type: BiquadFilterType = "lowpass") => {
   if (!audioCtx || muted) return;
   resume();
   try {
@@ -50,12 +53,13 @@ const noiseBurst = (duration: number, gain = 0.08, filterFreq = 800) => {
     const buffer = audioCtx.createBuffer(1, frames, audioCtx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < frames; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / frames);
+      const env = 1 - i / frames;
+      data[i] = (Math.random() * 2 - 1) * env * env;
     }
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
     const filter = audioCtx.createBiquadFilter();
-    filter.type = "lowpass";
+    filter.type = type;
     filter.frequency.value = filterFreq;
     const g = audioCtx.createGain();
     g.gain.value = gain;
@@ -72,47 +76,54 @@ const noiseBurst = (duration: number, gain = 0.08, filterFreq = 800) => {
 export const sfx = (name: string) => {
   switch (name) {
     case "place_building":
-      tone(660, 0.06, "square", 0.035);
-      tone(990, 0.08, "triangle", 0.025);
+      tone(520, 0.05, "triangle", 0.03);
+      tone(780, 0.07, "square", 0.028);
+      noiseBurst(0.05, 0.025, 1800, "bandpass");
       break;
     case "launch":
-      noiseBurst(0.12, 0.05, 1200);
-      tone(220, 0.22, "sawtooth", 0.05, 90);
-      setTimeout(() => tone(160, 0.2, "sawtooth", 0.035, 70), 50);
+      noiseBurst(0.16, 0.06, 1400);
+      tone(260, 0.28, "sawtooth", 0.055, 70);
+      setTimeout(() => tone(180, 0.24, "sawtooth", 0.04, 55), 40);
+      setTimeout(() => noiseBurst(0.1, 0.035, 900), 70);
       break;
     case "explosion":
-      noiseBurst(0.35, 0.12, 600);
-      tone(90, 0.4, "square", 0.07, 40);
-      setTimeout(() => noiseBurst(0.25, 0.06, 300), 40);
+      noiseBurst(0.42, 0.14, 700);
+      tone(70, 0.48, "square", 0.08, 32);
+      setTimeout(() => noiseBurst(0.28, 0.07, 280), 35);
+      setTimeout(() => tone(55, 0.35, "sawtooth", 0.04, 28), 60);
       break;
     case "alert":
-      tone(880, 0.1, "square", 0.05);
-      setTimeout(() => tone(880, 0.1, "square", 0.05), 160);
+      tone(920, 0.09, "square", 0.055);
+      setTimeout(() => tone(720, 0.09, "square", 0.05), 110);
+      setTimeout(() => tone(920, 0.1, "square", 0.055), 230);
       break;
     case "land":
-      noiseBurst(0.15, 0.07, 400);
-      tone(140, 0.28, "square", 0.06, 80);
+      noiseBurst(0.18, 0.08, 450);
+      tone(160, 0.3, "square", 0.065, 70);
+      setTimeout(() => noiseBurst(0.1, 0.04, 300), 50);
       break;
     case "victory":
-      tone(523, 0.18, "triangle", 0.07);
-      setTimeout(() => tone(659, 0.18, "triangle", 0.07), 160);
-      setTimeout(() => tone(784, 0.32, "triangle", 0.07), 320);
+      tone(523, 0.16, "triangle", 0.07);
+      setTimeout(() => tone(659, 0.16, "triangle", 0.07), 140);
+      setTimeout(() => tone(784, 0.2, "triangle", 0.07), 280);
+      setTimeout(() => tone(1046, 0.35, "triangle", 0.06), 440);
       break;
     case "defeat":
-      noiseBurst(0.4, 0.08, 250);
-      tone(220, 0.45, "sawtooth", 0.07, 80);
-      setTimeout(() => tone(140, 0.55, "sawtooth", 0.05, 50), 280);
+      noiseBurst(0.45, 0.09, 220);
+      tone(200, 0.5, "sawtooth", 0.07, 70);
+      setTimeout(() => tone(120, 0.6, "sawtooth", 0.05, 40), 260);
       break;
     case "intercept":
-      noiseBurst(0.06, 0.04, 2000);
-      tone(1200, 0.07, "square", 0.04, 600);
+      noiseBurst(0.07, 0.045, 2400, "highpass");
+      tone(1400, 0.08, "square", 0.045, 500);
+      setTimeout(() => tone(900, 0.05, "triangle", 0.03), 40);
       break;
     case "click":
-      tone(440, 0.04, "square", 0.03);
+      tone(480, 0.035, "square", 0.028);
       break;
     case "mech_step":
-      noiseBurst(0.04, 0.03, 500);
-      tone(90, 0.05, "square", 0.025);
+      noiseBurst(0.045, 0.035, 550);
+      tone(85, 0.055, "square", 0.028);
       break;
   }
 };
