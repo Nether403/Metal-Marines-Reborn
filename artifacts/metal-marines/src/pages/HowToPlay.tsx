@@ -143,9 +143,9 @@ export default function HowToPlay() {
               </p>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 Early sectors teach economy and multi-base defense. Mid campaign brings Gun Pods,
-                Dummy Bases, and ICBM Silos. Late sectors (13+) stay hard (difficulty ≥5) with
-                authored choke maps. Tunnel and ecology systems unlock as optional branches
-                once classic Metal Marines doctrine is secure.
+                Dummy Bases, and ICBM Silos. Late sectors 13–18 stay hard (difficulty ≥5) with
+                authored choke maps; 19–20 remain seeded frontier ops. Tunnel and ecology systems
+                unlock as optional branches once classic Metal Marines doctrine is secure.
               </p>
             </CardContent>
           </Card>

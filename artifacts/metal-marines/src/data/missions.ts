@@ -173,7 +173,7 @@ const M6_E = T(`
 ~~~~~~~~~~~~
 `);
 
-// Late-campaign authored maps (m13–m15) — choke islands for hard ops.
+// Late-campaign authored maps (m13–m18) — choke islands for hard ops.
 const M13_P = T(`
 ~~~~~~~~~~~~
 ~^^~....~^^~
@@ -246,6 +246,84 @@ const M15_E = T(`
 ~..F....F..~
 ~.FFF..FFF.~
 ~F.F.~~.F.F~
+~~~~~~~~~~~~
+`);
+
+// Twin lagoon bridges — two land spans across a cut channel.
+const M16_P = T(`
+~~~~~~~~~~~~
+~^^^^~~^^^^~
+~^F......F^~
+~.~~....~~.~
+~..F.HHH.F.~
+~....HHH...~
+~.FF.~.~.FF~
+~..........~
+~^^F~~~~F^^~
+~~~~~~~~~~~~
+`);
+const M16_E = T(`
+~~~~~~~~~~~~
+~^^F~~~~F^^~
+~..........~
+~.FF.~.~.FF~
+~....HHH...~
+~..F.HHH.F.~
+~.~~....~~.~
+~^F......F^~
+~^^^^~~^^^^~
+~~~~~~~~~~~~
+`);
+
+// Crescent ridge — mountains ring the pad; narrow forest gates.
+const M17_P = T(`
+~~~~~~~~~~~~
+~^^^^^^^^^^~
+~^........^~
+~^.~~~~~~.^~
+~^F.HHHH.F^~
+~^..HHHH..^~
+~^.F....F.^~
+~^..FFFF..^~
+~^^......^^~
+~~~~~~~~~~~~
+`);
+const M17_E = T(`
+~~~~~~~~~~~~
+~^^......^^~
+~^..FFFF..^~
+~^.F....F.^~
+~^..HHHH..^~
+~^F.HHHH.F^~
+~^.~~~~~~.^~
+~^........^~
+~^^^^^^^^^^~
+~~~~~~~~~~~~
+`);
+
+// Shatter channels — diagonal water cuts + canopy pockets (diff 6).
+const M18_P = T(`
+~~~~~~~~~~~~
+~F~~^^^^~~F~
+~.F.~..~.F.~
+~~.F.~~.F.~~
+~.^..HHH..^~
+~F...HHH..F~
+~.^^.~.~.^^~
+~F.F.~~.F.F~
+~.^~~~~~~^.~
+~~~~~~~~~~~~
+`);
+const M18_E = T(`
+~~~~~~~~~~~~
+~.^~~~~~~^.~
+~F.F.~~.F.F~
+~.^^.~.~.^^~
+~F...HHH..F~
+~.^..HHH..^~
+~~.F.~~.F.~~
+~.F.~..~.F.~
+~F~~^^^^~~F~
 ~~~~~~~~~~~~
 `);
 
@@ -525,6 +603,54 @@ const CAMPAIGN_EXTENSION: Array<{
     mapP: M15_P,
     mapE: M15_E,
   },
+  {
+    id: "m16",
+    index: 16,
+    title: "Operation: Twin Lagoon",
+    commanderId: "calder",
+    objective: "Cross the lagoon bridges and destroy the HQ.",
+    briefing:
+      "Twin water cuts leave only two land spans. Calder floods Mech Bays early — hold both bridges with Gun Pods and AA, then send Energy-priority gunships to starve his plants before the final Marine push.",
+    difficulty: 5,
+    aggression: 0.9,
+    eco: 0.55,
+    funds: 2000,
+    energy: 900,
+    mapP: M16_P,
+    mapE: M16_E,
+  },
+  {
+    id: "m17",
+    index: 17,
+    title: "Operation: Crescent Ridge",
+    commanderId: "stryx",
+    objective: "Breach the mountain crescent and end the HQ.",
+    briefing:
+      "A mountain ring funnels every approach through forest gates. Stryx stacks silos behind the ridge — Dummy Cover the approaches, punch AA with gunships, then crack the pad with Anti-POD Marines.",
+    difficulty: 5,
+    aggression: 0.92,
+    eco: 0.62,
+    funds: 2050,
+    energy: 920,
+    mapP: M17_P,
+    mapE: M17_E,
+  },
+  {
+    id: "m18",
+    index: 18,
+    title: "Operation: Shatter Channel",
+    commanderId: "null_",
+    objective: "Navigate shatter cuts and erase the HQ network.",
+    briefing:
+      "Diagonal channels and canopy pockets shatter drop lanes. NULL adapts on both bridges — multi-base, Factory doctrine on GUNSHIP, and ICBM only when the 3×3 silo survives. Difficulty maxed.",
+    difficulty: 6,
+    aggression: 0.95,
+    eco: 0.65,
+    funds: 2100,
+    energy: 950,
+    mapP: M18_P,
+    mapE: M18_E,
+  },
 ];
 
 for (const ext of CAMPAIGN_EXTENSION) {
@@ -547,10 +673,10 @@ for (const ext of CAMPAIGN_EXTENSION) {
   });
 }
 
-// Missions 16–20: seeded procedural ops — hard cadence (diff ≥5).
-for (let i = 16; i <= 20; i++) {
+// Missions 19–20: seeded procedural ops — hard cadence (diff ≥5).
+for (let i = 19; i <= 20; i++) {
   const seed = `campaign-${i}`;
-  const difficulty = i <= 17 ? 5 : 6;
+  const difficulty = 6;
   const generated = createProceduralMission({
     seed,
     difficulty,
@@ -564,7 +690,7 @@ for (let i = 16; i <= 20; i++) {
     objective: generated.objective,
     briefing: `${generated.briefing} Advanced campaign sector ${i}/20 — hard cadence. Tunnel and ecology tech are authorized if you can afford the diversion.`,
     difficulty,
-    enemyAggression: Math.min(1, 0.75 + (i - 16) * 0.05),
+    enemyAggression: Math.min(1, 0.85 + (i - 19) * 0.05),
   });
 }
 
