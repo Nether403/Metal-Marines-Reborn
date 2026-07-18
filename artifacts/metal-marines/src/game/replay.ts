@@ -66,6 +66,28 @@ export const runtimeDeterminismView = (state: RuntimeState) => ({
       state: m.state,
     }))
     .sort((a, b) => a.id.localeCompare(b.id)),
+  vehicles: state.vehicles
+    .map((v) => ({
+      id: v.id,
+      owner: v.owner,
+      side: v.side,
+      x: stableNumber(v.pos.x),
+      y: stableNumber(v.pos.y),
+      hp: stableNumber(v.hp),
+      state: v.state,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id)),
+  aircraft: state.aircraft
+    .map((a) => ({
+      id: a.id,
+      owner: a.owner,
+      side: a.side,
+      x: stableNumber(a.pos.x),
+      y: stableNumber(a.pos.y),
+      hp: stableNumber(a.hp),
+      state: a.state,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id)),
   weather: state.weatherActive
     ? {
         type: state.weatherActive.type,

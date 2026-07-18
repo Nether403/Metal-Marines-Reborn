@@ -96,7 +96,7 @@ export interface Mech {
   weaponMode: MechWeaponMode;
 }
 
-/** Ground vehicle stub — sprites ready; simulation may spawn later. */
+/** Ground APC — Factory garrison that hunts enemy mechs on the home island. */
 export interface Vehicle {
   id: string;
   owner: Owner;
@@ -106,9 +106,11 @@ export interface Vehicle {
   maxHp: number;
   state: "IDLE" | "MOVING" | "DEAD";
   facing?: number;
+  attackCooldown: number;
+  targetMechId?: string;
 }
 
-/** Aircraft / gunship stub — sprites ready; simulation may spawn later. */
+/** Gunship — Factory assault craft that flies to the enemy island and strafes. */
 export interface Aircraft {
   id: string;
   owner: Owner;
@@ -118,6 +120,8 @@ export interface Aircraft {
   maxHp: number;
   state: "IDLE" | "FLYING" | "DEAD";
   facing?: number;
+  attackCooldown: number;
+  targetBuildingId?: string;
 }
 
 export interface Particle {
@@ -255,7 +259,7 @@ export interface RuntimeState {
   buildings: Building[];
   projectiles: Projectile[];
   mechs: Mech[];
-  /** Stub lists — atlas sprites exist; engine does not spawn yet. */
+  /** Factory-produced APCs (home island) and gunships (cross-island assault). */
   vehicles: Vehicle[];
   aircraft: Aircraft[];
   particles: Particle[];

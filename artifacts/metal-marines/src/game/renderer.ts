@@ -1171,7 +1171,7 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
   }
 };
 
-/** Stub renderer — draws atlas when engine later spawns vehicles. */
+/** Draws Factory garrison APCs. */
 const drawVehicle = (ctx: CanvasRenderingContext2D, v: Vehicle, time: number) => {
   drawEntityShadow(ctx, v.pos.x, v.pos.y, 16, 7);
   const key = vehicleSpriteKey(v, time);
@@ -1195,7 +1195,7 @@ const drawVehicle = (ctx: CanvasRenderingContext2D, v: Vehicle, time: number) =>
   }
 };
 
-/** Stub renderer — draws atlas when engine later spawns aircraft. */
+/** Draws Factory assault gunships. */
 const drawAircraft = (ctx: CanvasRenderingContext2D, a: Aircraft, time: number) => {
   const airborne = a.state === "FLYING";
   drawEntityShadow(ctx, a.pos.x, a.pos.y + (airborne ? 6 : 2), 14, 5);
@@ -1458,7 +1458,7 @@ export const renderFrame = (
     const isUnderground = (m.layer ?? "SURFACE") === "UNDERGROUND";
     if (!isUnderground || underground || (m.detectedUntil ?? 0) > state.elapsed) drawMech(ctx, m, time);
   }
-  // Vehicles / aircraft (stub entities — empty until gameplay spawns them)
+  // Vehicles / aircraft (Factory garrison APCs + assault gunships)
   for (const v of state.vehicles) drawVehicle(ctx, v, time);
   for (const a of state.aircraft) drawAircraft(ctx, a, time);
   // Projectiles
