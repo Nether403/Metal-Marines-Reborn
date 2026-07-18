@@ -45,6 +45,9 @@ and record why in Memories.
 10. [ ] True isometric camera (large refactor — only after P0 feels solid).
 11. [ ] Multiplayer / replay foundation.
 
+Also done outside numbered art backlog (ROADMAP Phase 4): AI opening grace so
+idle early missions are not instant defeat — attack gate + longer ECO phase.
+
 When completing an item, mark it `[x]` here in the same PR when practical.
 
 ---

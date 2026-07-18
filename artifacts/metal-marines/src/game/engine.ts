@@ -62,7 +62,7 @@ import type {
   TileLayer,
   WeatherType,
 } from "./types";
-import { sfx } from "@/lib/sfx";
+import { sfx } from "../lib/sfx";
 
 let _id = 0;
 export const uid = (p = "x") => `${p}_${++_id}`;
@@ -1164,6 +1164,30 @@ type AiAction =
   | { kind: "build"; building: BuildingType; score: number; reason: string }
   | { kind: "attack"; projectile: ProjectileType; target: Building; score: number; reason: string };
 
+/** Seconds before AI may fire weapons — gives players time to place first eco/AA. */
+export const aiAttackGraceSeconds = (difficulty: number): number => {
+  if (difficulty <= 1) return 90;
+  if (difficulty <= 2) return 75;
+  if (difficulty <= 3) return 55;
+  if (difficulty <= 4) return 45;
+  return 35;
+};
+
+/** ECO phase end (seconds) — AI builds economy/defense before army tempo. */
+export const aiEcoPhaseEndsAt = (difficulty: number): number => {
+  if (difficulty <= 1) return 75;
+  if (difficulty <= 2) return 65;
+  if (difficulty <= 3) return 50;
+  return 40;
+};
+
+/** ARMY → ASSAULT transition (seconds). */
+export const aiArmyPhaseEndsAt = (difficulty: number): number => {
+  if (difficulty <= 2) return 125;
+  if (difficulty <= 4) return 105;
+  return 90;
+};
+
 const countBuildingsByType = (buildings: Building[], side: Owner): Record<BuildingType, number> => {
   const counts = {} as Record<BuildingType, number>;
   for (const key of Object.keys(BUILDINGS) as BuildingType[]) counts[key] = 0;
@@ -1217,6 +1241,7 @@ const scoreAiActions = (
   counts: Record<BuildingType, number>
 ): AiAction[] => {
   const memory = state.aiState.memory;
+  const phase = state.aiState.phase;
   const agg = mission.enemyAggression;
   const eco = mission.enemyEcoBias;
   const actions: AiAction[] = [];
@@ -1225,6 +1250,8 @@ const scoreAiActions = (
   const playerAa = playerTargets.filter((b) => b.type === "AA_GUN").length;
   const playerPower = playerTargets.find((b) => b.type === "ENERGY_PLANT") ?? hq;
   const playerRadar = playerTargets.find((b) => b.type === "RADAR") ?? hq;
+  const canAttack = state.elapsed >= aiAttackGraceSeconds(mission.difficulty);
+  const ecoFocus = phase === "ECO" ? 1 : 0;
 
   const addBuild = (building: BuildingType, score: number, reason: string) => {
     const cost = getBuildingCost(state.buildings, "ENEMY", building);
@@ -1233,20 +1260,25 @@ const scoreAiActions = (
     }
   };
   const addAttack = (projectile: ProjectileType, target: Building | undefined, score: number, reason: string) => {
-    if (!target) return;
+    if (!canAttack || !target) return;
     const cost = WEAPON_COSTS[projectile];
     if (state.enemyFunds >= cost.funds && state.enemyEnergy >= cost.energy) {
       actions.push({ kind: "attack", projectile, target, score, reason });
     }
   };
 
-  addBuild("ENERGY_PLANT", 80 * eco - counts.ENERGY_PLANT * 18 + Math.max(0, 180 - state.enemyEnergy) * 0.12, "power-growth");
-  addBuild("SUPPLY_DEPOT", 72 * eco - counts.SUPPLY_DEPOT * 16 + Math.max(0, 350 - state.enemyFunds) * 0.08, "funds-growth");
+  addBuild("ENERGY_PLANT", 80 * eco - counts.ENERGY_PLANT * 18 + Math.max(0, 180 - state.enemyEnergy) * 0.12 + ecoFocus * 12, "power-growth");
+  addBuild("SUPPLY_DEPOT", 72 * eco - counts.SUPPLY_DEPOT * 16 + Math.max(0, 350 - state.enemyFunds) * 0.08 + ecoFocus * 10, "funds-growth");
   addBuild("FACTORY", counts.FACTORY ? 12 : 40 + eco * 20, "build-tempo");
   addBuild("AA_GUN", 48 + state.stats.missilesFired * 2 - counts.AA_GUN * 18, "anti-missile-screen");
-  addBuild("MISSILE_LAUNCHER", counts.MISSILE_LAUNCHER ? 15 : 75 + agg * 20, "unlock-strikes");
-  addBuild("ICBM_SILO", counts.ICBM_SILO ? 8 : 30 + agg * 35, "strategic-icbm");
-  addBuild("METAL_MARINE_BASE", counts.METAL_MARINE_BASE ? 8 : 52 + agg * 45 - playerAa * 4, "ground-assault");
+  addBuild("MISSILE_LAUNCHER", counts.MISSILE_LAUNCHER ? 15 : 75 + agg * 20 - ecoFocus * 25, "unlock-strikes");
+  addBuild("ICBM_SILO", counts.ICBM_SILO ? 8 : 30 + agg * 35 - ecoFocus * 20, "strategic-icbm");
+  // Mech bay during ECO is deferred so opening is eco/defense, not an instant pod rush.
+  addBuild(
+    "METAL_MARINE_BASE",
+    counts.METAL_MARINE_BASE ? 8 : 52 + agg * 45 - playerAa * 4 - ecoFocus * 40,
+    "ground-assault"
+  );
   addBuild("GUN_TURRET", 32 + state.mechs.filter((m) => m.side === "ENEMY").length * 25 - counts.GUN_TURRET * 14, "base-defense");
   addBuild("GUN_POD", 38 + state.mechs.filter((m) => m.side === "ENEMY").length * 20 - counts.GUN_POD * 12, "gun-pod-bunker");
   addBuild("RADAR", counts.RADAR ? 8 : 45 + Object.keys(memory.seenPlayerBuildings).length * 2, "target-intel");
@@ -1294,9 +1326,11 @@ const aiTick = (state: RuntimeState, mission: MissionDef, dt: number) => {
   ai.nextActionAt -= dt;
   if (ai.nextActionAt > 0) return;
 
-  // Update phase based on count and time — slowed so early missions are playable
-  if (state.elapsed > 40 && ai.phase === "ECO") ai.phase = "ARMY";
-  if (state.elapsed > 90 && ai.phase === "ARMY") ai.phase = "ASSAULT";
+  // Phase clocks scale with difficulty — early ops stay in ECO longer.
+  const ecoEnds = aiEcoPhaseEndsAt(mission.difficulty);
+  const armyEnds = aiArmyPhaseEndsAt(mission.difficulty);
+  if (state.elapsed > ecoEnds && ai.phase === "ECO") ai.phase = "ARMY";
+  if (state.elapsed > armyEnds && ai.phase === "ARMY") ai.phase = "ASSAULT";
 
   const agg = mission.enemyAggression;
   const counts = countBuildingsByType(state.buildings, "ENEMY");
@@ -1322,7 +1356,7 @@ const aiTick = (state: RuntimeState, mission: MissionDef, dt: number) => {
   }
 
   // Schedule next action — slower cadence so players can establish bases
-  const base = ai.phase === "ECO" ? 7.5 : ai.phase === "ARMY" ? 5.0 : 3.2;
+  const base = ai.phase === "ECO" ? 8.5 : ai.phase === "ARMY" ? 5.5 : 3.4;
   ai.nextActionAt = base * rngRange(state, 0.75, 1.25) * (1.35 - agg * 0.35);
 
   // AI defensively launches AA when something inbound
