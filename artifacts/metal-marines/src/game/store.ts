@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   BuildingType,
+  FactoryDoctrine,
   MechTier,
   MechWeaponMode,
   MissionDef,
@@ -70,6 +71,7 @@ interface Store {
   selectWeapon: (t: ProjectileType | null) => void;
   selectMechWeapon: (mode: MechWeaponMode) => void;
   selectMechTier: (tier: MechTier) => void;
+  setFactoryDoctrine: (doctrine: FactoryDoctrine) => void;
   setViewLayer: (layer: TileLayer) => void;
   tryBuild: (x: number, y: number) => boolean;
   tryFire: (wx: number, wy: number) => boolean;
@@ -175,6 +177,16 @@ export const useGame = create<Store>((set, get) => ({
     set({ runtime: { ...rt } });
   },
 
+  setFactoryDoctrine: (doctrine) => {
+    const rt = get().runtime;
+    if (!rt) return;
+    if (rt.playerFactoryDoctrine !== doctrine) {
+      recordReplayCommand(rt, { type: "SET_FACTORY_DOCTRINE", payload: { doctrine } });
+    }
+    rt.playerFactoryDoctrine = doctrine;
+    set({ runtime: { ...rt } });
+  },
+
   setViewLayer: (layer) => {
     const rt = get().runtime;
     if (!rt) return;
@@ -270,6 +282,9 @@ export const useGame = create<Store>((set, get) => ({
       if (!m) return null;
       parsed.runtime.rngSeed ??= hashSeed(`${m.id}:${m.index}:${m.difficulty}`);
       parsed.runtime.viewLayer ??= "SURFACE";
+      parsed.runtime.playerFactoryDoctrine ??= "AUTO";
+      parsed.runtime.vehicles ??= [];
+      parsed.runtime.aircraft ??= [];
       parsed.runtime.terrainMutations ??= [];
       parsed.runtime.stats ??= {};
       parsed.runtime.stats.environmentalActions ??= 0;

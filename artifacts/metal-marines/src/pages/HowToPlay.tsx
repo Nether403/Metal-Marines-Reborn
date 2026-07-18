@@ -49,6 +49,7 @@ export default function HowToPlay() {
                 <li>
                   <span className="text-amber-300 font-bold">Factory</span> — speeds construction,
                   fields garrison APCs against landed Marines, and launches gunship strafes.
+                  Use Factory doctrine (Auto / APC / Gunship / Hold) once a Factory is online.
                 </li>
               </ul>
             </CardContent>
@@ -118,6 +119,9 @@ export default function HowToPlay() {
                 <li>ESC / Right-click — cancel selection</li>
                 <li>V — toggle surface / underground view</li>
                 <li>SPACE — pause</li>
+                <li>B / F / G / I / D / C — HQ, Factory, Gun Pod, ICBM Silo, Dummy Base, Dummy Cover</li>
+                <li>1–0 and - = [ ] \ — remaining build palette hotkeys</li>
+                <li>Q–Y — strike weapons (ICBM, Dummy, AA, Marine Drop, EMP, Buster)</li>
               </ul>
             </CardContent>
           </Card>
