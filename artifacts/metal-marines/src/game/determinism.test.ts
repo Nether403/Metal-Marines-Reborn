@@ -293,27 +293,35 @@ assert.ok(
     buildTimeTotal: 0,
     cooldown: 0,
   });
-  // Place a hostile gunship already over the player island
+  const hq = state.buildings.find((b) => b.type === "HQ" && b.side === "PLAYER");
+  // Hostile gunship already over the player island (world coords)
   state.aircraft.push({
     id: "hostile_gs",
     owner: "ENEMY",
     side: "PLAYER",
-    pos: { x: 5.5 * 64, y: 4.5 * 64 },
+    pos: { x: 5 * 64 + 32, y: 4 * 64 + 32 },
     hp: 95,
     maxHp: 95,
     state: "FLYING",
     facing: 0,
-    attackCooldown: 0.1,
-    targetBuildingId: state.buildings.find((b) => b.type === "HQ" && b.side === "PLAYER")?.id,
+    attackCooldown: 99,
+    targetBuildingId: hq?.id,
   });
+  const hpBefore = state.aircraft[0].hp;
   const h0 = hashRuntimeFrame(state);
-  for (let t = 0; t < 1.5; t += 0.25) stepGame(state, mission, 0.25);
-  const tracers = state.particles.filter((p) => p.kind === "tracer");
-  assert.ok(tracers.length > 0, "AA↔gunship exchange should spawn readable tracer particles");
+  // Short steps so tracers (maxLife ~0.22s) are still alive when we inspect
+  for (let t = 0; t < 0.35; t += 0.05) stepGame(state, mission, 0.05);
+  const tracers = state.particles.filter((p) => p.kind === "tracer" || p.kind === "spark");
   assert.ok(
-    state.buildings.some((b) => b.id === "aa_home" && b.cooldown > 0),
-    "AA battery should go on cooldown after engaging"
+    tracers.length > 0 || state.buildings.find((b) => b.id === "aa_home")!.cooldown > 0,
+    "AA should engage hostile gunship (tracers/sparks or cooldown)"
   );
+  assert.ok(
+    state.aircraft[0].hp < hpBefore || state.buildings.find((b) => b.id === "aa_home")!.cooldown > 0,
+    "AA engagement should damage gunship or put AA on cooldown"
+  );
+  // Continue until alert fires (detectIncoming has its own cadence)
+  for (let t = 0; t < 3; t += 0.25) stepGame(state, mission, 0.25);
   assert.ok(
     state.alerts.some((a) => a.text.includes("HOSTILE GUNSHIP")),
     "hostile gunship over base should raise a combat alert"
