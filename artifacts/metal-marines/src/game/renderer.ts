@@ -454,12 +454,12 @@ const drawIsland = (
       if (!drewTerrain) {
         drawTerrainFallback(ctx, tile, px, py, x, y, t);
       }
-      // Per-tile grass micro-variation so the island doesn't read as flat green paper
-      if (tile.terrain === "GRASS") {
-        const n = ((x * 17 + y * 31) % 7) / 7;
-        ctx.fillStyle = `rgba(20,60,30,${0.04 + n * 0.07})`;
-        ctx.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
-      }
+      // Lighter grass wash — remaster atlas already carries micro detail
+            if (tile.terrain === "GRASS") {
+              const n = ((x * 17 + y * 31) % 7) / 7;
+              ctx.fillStyle = `rgba(20,60,30,${0.02 + n * 0.03})`;
+              ctx.fillRect(px + 2, py + 2, TILE_PX - 4, TILE_PX - 4);
+            }
       // Reinforce forest canopy silhouettes when the atlas is scaled down in the CSS stage
       if (tile.terrain === "FOREST" && drewTerrain) {
         const clumps = [
@@ -677,16 +677,8 @@ const drawConstructionScaffold = (ctx: CanvasRenderingContext2D, cx: number, cy:
   ctx.restore();
 };
 
-const drawBuildingLabel = (ctx: CanvasRenderingContext2D, cx: number, cy: number, type: BuildingType) => {
-  ctx.fillStyle = "rgba(2,6,23,0.76)";
-  ctx.fillRect(cx - 13, cy - 5, 26, 11);
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "bold 8px 'Space Mono', monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(buildingGlyph[type] ?? "?", cx, cy + 1);
-  ctx.textAlign = "start";
-  ctx.textBaseline = "alphabetic";
+const drawBuildingLabel = (_ctx: CanvasRenderingContext2D, _cx: number, _cy: number, _type: BuildingType) => {
+  // Remaster: silhouettes carry identity — text chips clutter combat zoom.
 };
 
 const drawProceduralBuilding = (ctx: CanvasRenderingContext2D, b: Building, cx: number, cy: number, now: number) => {
@@ -839,43 +831,16 @@ const drawBuilding = (ctx: CanvasRenderingContext2D, b: Building, hidden: boolea
   const { x: cx, y: cy } = tileToWorld(b.side, b.pos.x, b.pos.y);
   const spriteKey = buildingSpriteKey(b, now);
   // Classic Metal Marines pads under structures — sells "built base" density.
-  drawEntityShadow(ctx, cx, cy, b.type === "HQ" || b.type === "ICBM_SILO" ? 22 : 16, 8);
-  ctx.save();
-  if (b.side === "PLAYER") {
-    ctx.strokeStyle = "rgba(248,113,113,0.35)";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
-  } else {
-    // Gold outer + purple inner so fog-revealed enemy bases read faction at combat zoom.
-    ctx.strokeStyle = "rgba(245,158,11,0.62)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(cx - TILE_PX * 0.42, cy - TILE_PX * 0.2, TILE_PX * 0.84, TILE_PX * 0.55);
-    ctx.strokeStyle = "rgba(192,132,252,0.45)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(cx - TILE_PX * 0.36, cy - TILE_PX * 0.14, TILE_PX * 0.72, TILE_PX * 0.42);
-  }
-  ctx.restore();
+    drawEntityShadow(ctx, cx, cy, b.type === "HQ" || b.type === "ICBM_SILO" ? 22 : 16, 8);
 
-  // HQ reads largest (classic MM command presence); other structures slightly overscale.
-  const scale =
-    (TILE_PX / 64) *
-    (b.type === "HQ" || b.type === "ICBM_SILO" ? 1.75 : b.type === "METAL_MARINE_BASE" ? 1.6 : 1.52);
-  if (spriteManager.draw(ctx, spriteKey, cx, cy, { scale })) {
-    // Reinforce enemy gold/purple identity when CSS stage scales sprites down.
-    if (b.side === "ENEMY") {
-      ctx.save();
-      ctx.fillStyle = "rgba(245,158,11,0.85)";
-      ctx.fillRect(cx - 10, cy + 10, 4, 2);
-      ctx.fillRect(cx + 6, cy + 10, 4, 2);
-      ctx.fillStyle = "rgba(216,180,254,0.75)";
-      ctx.beginPath();
-      ctx.arc(cx + (b.type === "HQ" ? 0 : 6), cy - (b.type === "HQ" ? 18 : 12), 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+    // HQ reads largest (classic MM command presence); keep others near tile scale so
+    // silhouettes stay sharp (overscale was muddying the remaster atlas).
+    const scale =
+      (TILE_PX / 64) *
+      (b.type === "HQ" || b.type === "ICBM_SILO" ? 1.35 : b.type === "METAL_MARINE_BASE" ? 1.25 : 1.15);
+    if (!spriteManager.draw(ctx, spriteKey, cx, cy, { scale })) {
+      drawProceduralBuilding(ctx, b, cx, cy, now);
     }
-  } else {
-    drawProceduralBuilding(ctx, b, cx, cy, now);
-  }
 
   if ((b.disabledUntil ?? 0) > now) {
     ctx.strokeStyle = "rgba(34,211,238,0.8)";
@@ -1172,18 +1137,9 @@ const drawMech = (ctx: CanvasRenderingContext2D, m: Mech, time: number) => {
     });
   if (!drew) drawProceduralMech(ctx, m);
 
-  // Original-game style unit callout
-  ctx.save();
-  ctx.font = "bold 8px 'Space Mono', ui-monospace, monospace";
-  ctx.textAlign = "center";
-  ctx.fillStyle = "rgba(0,0,0,0.55)";
-  ctx.fillRect(m.pos.x - 22, m.pos.y - 36, 44, 11);
-  ctx.fillStyle = m.side === "PLAYER" ? "#fecaca" : "#fde68a";
-  ctx.fillText("M.MARINE", m.pos.x, m.pos.y - 27);
-  ctx.textAlign = "start";
-  ctx.restore();
+    // Selection ring only — no M.MARINE text chip (OG didn't need floating names).
 
-  if (m.hp < m.maxHp) {
+    if (m.hp < m.maxHp) {
     ctx.fillStyle = "rgba(0,0,0,0.7)";
     ctx.fillRect(m.pos.x - 13, m.pos.y + 18, 26, 3);
     ctx.fillStyle = m.hp / m.maxHp > 0.35 ? "#22c55e" : "#ef4444";
