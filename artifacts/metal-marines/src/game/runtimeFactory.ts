@@ -1,6 +1,6 @@
 import type { BuildingType, MissionDef, RuntimeState, Tile } from "./types";
-import { BUILDINGS, GRID_H, GRID_W } from "./constants";
-import { resetEntityIds, uid } from "./engine";
+import { BUILDINGS, GRID_H, GRID_W, MECH_HP } from "./constants";
+import { resetEntityIds, tileToWorld, uid } from "./engine";
 import { hashSeed } from "./rng";
 
 /** Keep in sync with DEFAULT_REPLAY_TICK_DT in replay.ts (avoid circular import). */
@@ -38,29 +38,36 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
   };
 
   pushBuilding("HQ", "PLAYER", mission.playerStartHQ);
-  pushBuilding("HQ", "ENEMY", mission.enemyStartHQ);
+    pushBuilding("HQ", "ENEMY", mission.enemyStartHQ);
 
-  // Give the AI a head-start of basic eco (gentler on easy missions)
-  pushBuilding("ENERGY_PLANT", "ENEMY", {
-    x: mission.enemyStartHQ.x - 2,
-    y: mission.enemyStartHQ.y,
-  });
-  pushBuilding("SUPPLY_DEPOT", "ENEMY", {
-    x: mission.enemyStartHQ.x + 2,
-    y: mission.enemyStartHQ.y,
-  });
-  if (mission.difficulty >= 2) {
-    pushBuilding("AA_GUN", "ENEMY", {
-      x: mission.enemyStartHQ.x,
-      y: mission.enemyStartHQ.y - 2,
-    });
-  }
-  if (mission.difficulty >= 3) {
-    pushBuilding("GUN_POD", "ENEMY", {
-      x: mission.enemyStartHQ.x + 1,
-      y: mission.enemyStartHQ.y + 1,
-    });
-  }
+    // Denser starting bases — classic Metal Marines reads as fortresses, not empty lawns.
+    const p = mission.playerStartHQ;
+    const e = mission.enemyStartHQ;
+    const ring = (
+      side: "PLAYER" | "ENEMY",
+      hq: { x: number; y: number },
+      extraDefense: boolean
+    ) => {
+      pushBuilding("ENERGY_PLANT", side, { x: hq.x - 2, y: hq.y });
+      pushBuilding("SUPPLY_DEPOT", side, { x: hq.x + 2, y: hq.y });
+      pushBuilding("MISSILE_LAUNCHER", side, { x: hq.x, y: hq.y - 2 });
+      pushBuilding("GUN_TURRET", side, { x: hq.x - 2, y: hq.y - 2 });
+      pushBuilding("RADAR", side, { x: hq.x + 2, y: hq.y - 2 });
+      if (extraDefense) {
+        pushBuilding("AA_GUN", side, { x: hq.x - 2, y: hq.y + 2 });
+        pushBuilding("GUN_POD", side, { x: hq.x + 2, y: hq.y + 2 });
+        pushBuilding("METAL_MARINE_BASE", side, { x: hq.x, y: hq.y + 2 });
+      }
+    };
+    ring("PLAYER", p, true);
+    ring("ENEMY", e, mission.difficulty >= 2);
+    if (mission.difficulty >= 3) {
+      pushBuilding("FACTORY", "ENEMY", { x: e.x, y: e.y + 2 });
+    }
+
+    // Full enemy-island intel for opening clarity (classic MM often shows both theaters).
+    // Radar gameplay still expands fog further via engine; start readable, not empty black.
+    for (let i = 0; i < fogEnemy.length; i++) fogEnemy[i] = true;
 
   const withTunnels = (tiles: Tile[], hq: { x: number; y: number }): Tile[] =>
     tiles.map((t) => {
@@ -86,11 +93,48 @@ export const createMissionRuntime = (mission: MissionDef): RuntimeState => {
     playerFundsRate: 2,
     playerEnergyRate: 0,
     buildings,
-    projectiles: [],
-    mechs: [],
-    vehicles: [],
-    aircraft: [],
-    particles: [],
+        projectiles: [],
+        mechs: [
+          {
+            id: uid("m"),
+            owner: "PLAYER",
+            side: "PLAYER",
+            pos: tileToWorld("PLAYER", p.x - 1, p.y + 1),
+            hp: MECH_HP,
+            maxHp: MECH_HP,
+            state: "WALKING",
+            attackCooldown: 0,
+            tier: "GUNNER_I",
+            weaponMode: "NORMAL",
+          },
+          {
+            id: uid("m"),
+            owner: "PLAYER",
+            side: "PLAYER",
+            pos: tileToWorld("PLAYER", p.x + 1, p.y + 1),
+            hp: MECH_HP,
+            maxHp: MECH_HP,
+            state: "WALKING",
+                        attackCooldown: 0,
+                        tier: "GUNNER_I",
+                        weaponMode: "NORMAL",
+                      },
+                      {
+                        id: uid("m"),
+                        owner: "ENEMY",
+            side: "ENEMY",
+            pos: tileToWorld("ENEMY", e.x, e.y + 1),
+            hp: MECH_HP,
+            maxHp: MECH_HP,
+            state: "WALKING",
+            attackCooldown: 0,
+            tier: "GUNNER_I",
+            weaponMode: "NORMAL",
+          },
+        ],
+        vehicles: [],
+        aircraft: [],
+        particles: [],
     fogPlayer,
     fogEnemy,
     alerts: [],
