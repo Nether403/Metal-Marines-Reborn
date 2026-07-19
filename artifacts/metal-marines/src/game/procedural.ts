@@ -3,11 +3,54 @@ import { findPath } from "./pathfinding";
 import { createRng, hashSeed } from "./rng";
 import type { MissionDef, Position, TerrainType, Tile } from "./types";
 
+export const SKIRMISH_DIFFICULTIES = [1, 2, 3, 4, 5] as const;
+export type SkirmishDifficulty = (typeof SKIRMISH_DIFFICULTIES)[number];
+
 interface ProceduralOptions {
   seed: string;
   difficulty: number;
   title?: string;
 }
+
+/** Clamp to campaign-style 1–5 skirmish difficulty. */
+export const clampSkirmishDifficulty = (raw: number): SkirmishDifficulty => {
+  const n = Math.round(Number(raw));
+  if (!Number.isFinite(n)) return 5;
+  return Math.max(1, Math.min(5, n)) as SkirmishDifficulty;
+};
+
+/** Alphanumeric seed fragment safe for `/play/:missionId` routes. */
+export const sanitizeSkirmishSeed = (raw: string): string => {
+  const cleaned = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24);
+  return cleaned || `s${Date.now().toString(36).slice(-6)}`;
+};
+
+export const randomSkirmishSeed = (): string =>
+  `s${Date.now().toString(36).slice(-6)}`;
+
+/** Canonical id: `skirmish-d{1-5}-{seed}`. */
+export const formatSkirmishMissionId = (seed: string, difficulty: number): string =>
+  `skirmish-d${clampSkirmishDifficulty(difficulty)}-${sanitizeSkirmishSeed(seed)}`;
+
+/**
+ * Parse skirmish mission ids.
+ * - New: `skirmish-d3-alpha`
+ * - Legacy: `skirmish-alpha` → difficulty 5 (previous hard-coded default)
+ */
+export const parseSkirmishMissionId = (
+  id: string
+): { seed: string; difficulty: SkirmishDifficulty } | null => {
+  if (!id.startsWith("skirmish-")) return null;
+  const rest = id.slice("skirmish-".length);
+  const tagged = /^d([1-5])-(.+)$/.exec(rest);
+  if (tagged) {
+    return {
+      difficulty: Number(tagged[1]) as SkirmishDifficulty,
+      seed: tagged[2] || "reborn",
+    };
+  }
+  return { difficulty: 5, seed: rest || "reborn" };
+};
 
 interface IslandResult {
   tiles: Tile[];
@@ -95,7 +138,9 @@ const generateIsland = (seed: number, mirror = false): IslandResult => {
 };
 
 export const createProceduralMission = ({ seed, difficulty, title }: ProceduralOptions): MissionDef => {
-  const baseSeed = hashSeed(seed);
+  const safeSeed = sanitizeSkirmishSeed(seed);
+  const diff = clampSkirmishDifficulty(difficulty);
+  const baseSeed = hashSeed(safeSeed);
   let player = generateIsland(baseSeed, false);
   let enemy = generateIsland(baseSeed ^ 0x9e3779b9, true);
 
@@ -106,26 +151,26 @@ export const createProceduralMission = ({ seed, difficulty, title }: ProceduralO
   }
 
   return {
-    id: `skirmish-${seed}`,
+    id: formatSkirmishMissionId(safeSeed, diff),
     index: 7,
     title: title ?? "Procedural Skirmish",
     commanderId: "null_",
     objective: "Win a generated island war. Destroy the enemy Headquarters.",
     briefing:
-      `Generated battlefield seed ${seed}. Terrain validation: ` +
+      `Generated battlefield seed ${safeSeed} · difficulty ${diff}. Terrain validation: ` +
       [...player.validation, ...enemy.validation].join(", "),
-    difficulty,
+    difficulty: diff,
     playerIsland: player.tiles,
     enemyIsland: enemy.tiles,
     playerStartHQ: player.hq,
     enemyStartHQ: enemy.hq,
-    enemyAggression: Math.min(1, 0.45 + difficulty * 0.08),
-    enemyEcoBias: Math.min(0.8, 0.45 + difficulty * 0.04),
-    startFunds: 1200 + difficulty * 80,
-    startEnergy: 520 + difficulty * 35,
+    enemyAggression: Math.min(1, 0.45 + diff * 0.08),
+    enemyEcoBias: Math.min(0.8, 0.45 + diff * 0.04),
+    startFunds: 1200 + diff * 80,
+    startEnergy: 520 + diff * 35,
     isProcedural: true,
     proceduralMeta: {
-      seed,
+      seed: safeSeed,
       validation: [...player.validation, ...enemy.validation],
     },
   };

@@ -132,11 +132,11 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
   ];
 
   const gunshipPriorities: { id: GunshipStrikePriority; label: string; title: string }[] = [
-    { id: "AUTO", label: "Auto", title: "Gunships prefer HQ, then AA, then nearest" },
-    { id: "HQ", label: "HQ", title: "Prioritize enemy Headquarters" },
-    { id: "AA", label: "AA", title: "Prioritize enemy AA Batteries" },
-    { id: "ENERGY", label: "Energy", title: "Prioritize enemy Energy Plants" },
-    { id: "MISSILE", label: "Missile", title: "Prioritize Missile / ICBM Silos" },
+    { id: "AUTO", label: "Auto", title: "Gunships prefer HQ, then AA, then nearest [U]" },
+    { id: "HQ", label: "HQ", title: "Prioritize enemy Headquarters [J]" },
+    { id: "AA", label: "AA", title: "Prioritize enemy AA Batteries [K]" },
+    { id: "ENERGY", label: "Energy", title: "Prioritize enemy Energy Plants [L]" },
+    { id: "MISSILE", label: "Missile", title: "Prioritize Missile / ICBM Silos [;]" },
   ];
 
   const readyWeapons = weaponOrder.filter((t) => {
@@ -439,7 +439,7 @@ export default function BuildPalette({ state }: { state: RuntimeState }) {
         style={{ borderColor: "var(--hud-line)", color: "rgba(100,116,139,0.5)" }}
       >
         <span>Tabs filter builds · Left island → BUILD · Right island → FIRE · ESC / Right-click → cancel</span>
-        <span>1–0 build · Q–\ weapons · V layer · SPACE pause</span>
+        <span>1–0 build · Q–\ weapons · Z/X N/M/P O/A/S/H U/J/K/L/; strike · V layer · SPACE pause</span>
       </div>
     </div>
   );

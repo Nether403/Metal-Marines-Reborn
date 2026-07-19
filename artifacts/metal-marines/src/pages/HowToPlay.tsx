@@ -127,6 +127,7 @@ export default function HowToPlay() {
                 <li>Q–Y — strike weapons (ICBM, Dummy, AA, Marine Drop, EMP, Buster)</li>
                 <li>Z / X — Gunner I / Gunner II · N / M / P — Normal / Anti-MMR / Anti-POD</li>
                 <li>O / A / S / H — Factory Auto / APC / Gunship / Hold</li>
+                <li>U / J / K / L / ; — Gunship strike Auto / HQ / AA / Energy / Missile</li>
               </ul>
             </CardContent>
           </Card>
@@ -147,7 +148,9 @@ export default function HowToPlay() {
                 Early sectors teach economy and multi-base defense. Mid campaign brings Gun Pods,
                 Dummy Bases, and ICBM Silos. Late sectors 13–20 stay hard (difficulty ≥5) with
                 authored choke maps through the finale. Tunnel and ecology systems unlock as
-                optional branches once classic Metal Marines doctrine is secure.
+                optional branches once classic Metal Marines doctrine is secure. Theater and
+                Mission List skirmish generation accept difficulty 1–5 plus an optional seed for
+                rematches.
               </p>
             </CardContent>
           </Card>

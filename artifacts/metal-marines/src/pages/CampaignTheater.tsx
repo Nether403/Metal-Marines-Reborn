@@ -4,6 +4,12 @@ import { MISSIONS, getMission } from "@/data/missions";
 import { COMMANDERS } from "@/data/commanders";
 import { THEATER_LINKS, THEATER_NODES } from "@/data/theater";
 import { useGame, isMissionUnlocked } from "@/game/store";
+import {
+  SKIRMISH_DIFFICULTIES,
+  formatSkirmishMissionId,
+  randomSkirmishSeed,
+  type SkirmishDifficulty,
+} from "@/game/procedural";
 import { Button } from "@/components/ui/button";
 import { Lock, CheckCircle2, Play, Radar, List } from "lucide-react";
 
@@ -29,6 +35,8 @@ export default function CampaignTheater() {
       (m) => nodeState(m.index, progress.cleared, m.id) === "available"
     )?.id ?? "m1";
   const [selectedId, setSelectedId] = useState(firstAvailable);
+  const [skirmishDiff, setSkirmishDiff] = useState<SkirmishDifficulty>(3);
+  const [skirmishSeed, setSkirmishSeed] = useState("");
   const selected = getMission(selectedId);
   const selectedCmd = selected ? COMMANDERS[selected.commanderId] : null;
   const selectedState = selected
@@ -274,16 +282,49 @@ export default function CampaignTheater() {
                       </Button>
                     </Link>
                   )}
-                  <Button
-                    variant="outline"
-                    className="w-full font-mono border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/10"
-                    onClick={() => {
-                      const seed = `s${Date.now().toString(36).slice(-6)}`;
-                      setLocation(`/play/skirmish-${seed}`);
-                    }}
-                  >
-                    GENERATE SKIRMISH
-                  </Button>
+                  <div className="space-y-2 rounded border border-cyan-400/25 bg-cyan-950/20 p-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-200/70">
+                        Diff
+                      </span>
+                      {SKIRMISH_DIFFICULTIES.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setSkirmishDiff(d)}
+                          className={`min-w-7 px-1.5 py-0.5 font-mono text-xs border transition-colors ${
+                            skirmishDiff === d
+                              ? "border-cyan-300 bg-cyan-500/25 text-cyan-100"
+                              : "border-white/15 text-slate-400 hover:border-cyan-400/40"
+                          }`}
+                          title={`AI aggression tier ${d}`}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      value={skirmishSeed}
+                      onChange={(e) => setSkirmishSeed(e.target.value)}
+                      placeholder="Seed (optional)"
+                      maxLength={24}
+                      className="w-full rounded border border-white/15 bg-black/40 px-2 py-1.5 font-mono text-xs text-cyan-50 placeholder:text-slate-500 focus:border-cyan-400/50 focus:outline-none"
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                    <Button
+                      variant="outline"
+                      className="w-full font-mono border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/10"
+                      onClick={() => {
+                        const seed = skirmishSeed.trim()
+                          ? skirmishSeed
+                          : randomSkirmishSeed();
+                        setLocation(`/play/${formatSkirmishMissionId(seed, skirmishDiff)}`);
+                      }}
+                    >
+                      GENERATE SKIRMISH
+                    </Button>
+                  </div>
                 </div>
               </>
             ) : (

@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { MISSIONS, getMission } from "@/data/missions";
 import { COMMANDERS } from "@/data/commanders";
 import { useGame, isMissionUnlocked } from "@/game/store";
+import {
+  SKIRMISH_DIFFICULTIES,
+  formatSkirmishMissionId,
+  randomSkirmishSeed,
+  type SkirmishDifficulty,
+} from "@/game/procedural";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock, CheckCircle2, Play } from "lucide-react";
@@ -14,6 +21,13 @@ export default function MissionSelect() {
   const [, setLocation] = useLocation();
   const snap = hasSnapshot();
   const snapMission = snap ? getMission(snap.missionId) : null;
+  const [skirmishDiff, setSkirmishDiff] = useState<SkirmishDifficulty>(3);
+  const [skirmishSeed, setSkirmishSeed] = useState("");
+
+  const launchSkirmish = () => {
+    const seed = skirmishSeed.trim() ? skirmishSeed : randomSkirmishSeed();
+    setLocation(`/play/${formatSkirmishMissionId(seed, skirmishDiff)}`);
+  };
 
   return (
     <div className="min-h-screen bg-background p-6 md:p-8 overflow-y-auto">
@@ -104,16 +118,49 @@ export default function MissionSelect() {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Deterministic island generator with validation for coastline, buildable area, chokepoints, and navigable mech routes.
               </p>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-secondary/80">
+                    Difficulty
+                  </span>
+                  {SKIRMISH_DIFFICULTIES.map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setSkirmishDiff(d)}
+                      className={`min-w-7 px-1.5 py-0.5 font-mono text-xs border transition-colors ${
+                        skirmishDiff === d
+                          ? "border-secondary bg-secondary/25 text-secondary"
+                          : "border-border/60 text-muted-foreground hover:border-secondary/50"
+                      }`}
+                      title={`AI aggression tier ${d}`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+                <label className="block space-y-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-secondary/80">
+                    Seed (optional)
+                  </span>
+                  <input
+                    value={skirmishSeed}
+                    onChange={(e) => setSkirmishSeed(e.target.value)}
+                    placeholder="leave blank for random"
+                    maxLength={24}
+                    className="w-full rounded border border-border/60 bg-background/80 px-2 py-1.5 font-mono text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-secondary/60 focus:outline-none"
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                </label>
+              </div>
               <div className="pt-3 border-t border-border/50">
                 <p className="text-xs font-mono text-secondary mb-3 uppercase tracking-wider">
                   OBJECTIVE: Destroy the generated enemy HQ
                 </p>
                 <Button
                   className="w-full font-mono bg-secondary/20 hover:bg-secondary hover:text-secondary-foreground text-secondary border border-secondary/50 transition-all"
-                  onClick={() => {
-                    const seed = `s${Date.now().toString(36).slice(-6)}`;
-                    setLocation(`/play/skirmish-${seed}`);
-                  }}
+                  onClick={launchSkirmish}
                 >
                   GENERATE SECTOR
                 </Button>
